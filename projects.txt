@@ -1,0 +1,8 @@
+awx
+django-ansible-base
+dispatcherd
+aap-testing-framework
+atf-sdk
+awx_plugins.interfaces
+awx-plugins
+ansible-runner
