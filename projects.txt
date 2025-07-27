@@ -4,5 +4,5 @@ dispatcherd
 aap-testing-framework
 atf-sdk
 awx_plugins.interfaces
-awx-plugins
+awx-plugins:credentials-github-app
 ansible-runner
