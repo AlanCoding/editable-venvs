@@ -1,0 +1,7 @@
+pip
+setuptools
+wheel
+psycopg
+pbr
+setuptools_scm
+pkgconfig

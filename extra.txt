@@ -1,0 +1,2 @@
+awx/requirements/requirements.in
+awx/requirements/requirements_dev.txt
