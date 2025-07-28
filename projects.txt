@@ -1,5 +1,5 @@
 awx
-django-ansible-base:authentication,rest-filters,jwt_consumer,resource-registry,rbac,feature-flags,api-documentation
+django-ansible-base:authentication,rest-filters,jwt_consumer,resource-registry,rbac,feature-flags,api-documentation,oauth2-provider
 dispatcherd
 aap-testing-framework
 atf-sdk
