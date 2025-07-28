@@ -1,2 +1,3 @@
 awx/requirements/requirements.in
 awx/requirements/requirements_dev.txt
+django-ansible-base/requirements/requirements_dev.txt

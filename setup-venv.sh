@@ -33,6 +33,14 @@ echo "📦 Creating clean venv at: $VENV_DIR"
 $PYTHON -m venv "$VENV_DIR" --clear
 source "$VENV_DIR/bin/activate"
 python -m ensurepip --upgrade
+# Verify pip is correct
+VENV_BIN_DIR=$(dirname "$(which python)")
+EXPECTED_PIP="$VENV_BIN_DIR/pip"
+ACTUAL_PIP=$(which pip)
+if [[ "$ACTUAL_PIP" != "$EXPECTED_PIP" ]]; then
+  echo "🚨 pip is not from venv! Got: $ACTUAL_PIP"
+  exit 1
+fi
 
 echo "📚 Parsing projects.txt (with optional extras)"
 PROJECT_PATHS=()
