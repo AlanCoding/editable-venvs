@@ -19,6 +19,6 @@ Set up clean, isolated virtual environments for multi-repo Python projects.
 ## Usage
 
 ```bash
-./setup-venv.sh awx
+PYTHON=python3.11 ./setup-venv.sh awx
 ```
 

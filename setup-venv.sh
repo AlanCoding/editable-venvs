@@ -9,7 +9,7 @@ PROJECTS_FILE="projects.txt"
 EXTRA_REQUIREMENTS_FILE="extra.txt"
 EXCLUDE_FILE="exclude.txt"
 SANITIZED_DIR="sanitized"
-PYTHON="/usr/bin/python"
+PYTHON="${PYTHON:-python3}"
 
 # Set verbosity control (export PIP_QUIET=1 to enable)
 PIP_QUIET="${PIP_QUIET:-1}"
@@ -83,10 +83,10 @@ for path in "${PROJECT_PATHS[@]}"; do
   if [[ -n "${EXTRAS_MAP[$path]+x}" ]]; then
     extras="${EXTRAS_MAP[$path]}"
     echo "🔁 Reinstalling as editable with extras [$extras]: $path"
-    "${PIP_INSTALL_CMD[@]}" -e "$path[$extras]"
+    "${PIP_INSTALL_CMD[@]}" -e "$path[$extras]" -c constraints.txt
   else
     echo "🔁 Reinstalling as editable: $path"
-    "${PIP_INSTALL_CMD[@]}" -e "$path"
+    "${PIP_INSTALL_CMD[@]}" -e "$path" -c constraints.txt
   fi
 done
 
