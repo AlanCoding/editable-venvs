@@ -5,8 +5,10 @@ set -euo pipefail
 VENV_NAME="$1"
 REPO_ROOT="${REPO_ROOT:-$HOME/repos}"
 VENV_DIR="$HOME/venvs/$VENV_NAME"
+POETRY_VENV_DIR="$HOME/venvs/poetry"
 CONFIG_DIR="${CONFIG_DIR:-config}"
 PROJECTS_FILE="$CONFIG_DIR/editable_projects.txt"
+POETRY_PROJECTS_FILE="$CONFIG_DIR/poetry_projects.txt"
 EXTRA_REQUIREMENTS_FILE="$CONFIG_DIR/requirement_files.txt"
 EXCLUDE_FILE="$CONFIG_DIR/exclude_for_files.txt"
 CONSTRAINTS_FILE="$CONFIG_DIR/constraints_for_editable.txt"
@@ -29,6 +31,20 @@ mkdir -p "$SANITIZED_DIR"
 if [[ -d "$VENV_DIR" ]]; then
   echo "Phase 1: Deleting existing venv at: $VENV_DIR"
   rm -rf "$VENV_DIR"
+  echo "  deleting contents of sanitized/ folder"
+  rm -rf sanitized/*
+fi
+
+# Setup poetry venv if it doesn't exist
+if [[ ! -d "$POETRY_VENV_DIR" ]]; then
+  echo "Phase 1: Creating poetry venv at: $POETRY_VENV_DIR"
+  $PYTHON -m venv "$POETRY_VENV_DIR" --clear
+  source "$POETRY_VENV_DIR/bin/activate"
+  python -m ensurepip --upgrade
+  pip install --quiet poetry
+  poetry self remove poetry-plugin-export
+  poetry self add poetry-plugin-export
+  deactivate
 fi
 
 echo
@@ -62,8 +78,32 @@ while IFS= read -r line; do
   fi
 done < "$PROJECTS_FILE"
 
+# Phase 2.5: Export poetry projects to requirements files
+if [[ -f "$POETRY_PROJECTS_FILE" ]]; then
+  echo
+  echo "Phase 2.5: Exporting poetry projects to requirements files"
+  while IFS= read -r poetry_project; do
+    [[ -z "$poetry_project" || "$poetry_project" =~ ^# ]] && continue
+    poetry_project_path="$REPO_ROOT/$poetry_project"
+    if [[ ! -d "$poetry_project_path" ]]; then
+      echo "Skipping missing poetry project: $poetry_project_path"
+      continue
+    fi
+    if [[ ! -f "$poetry_project_path/pyproject.toml" ]]; then
+      echo "Skipping $poetry_project_path - no pyproject.toml found"
+      continue
+    fi
+
+    sanitized_poetry_req="$SANITIZED_DIR/$(basename "$poetry_project").txt"
+    echo "Exporting poetry project $poetry_project to: $sanitized_poetry_req"
+    "$POETRY_VENV_DIR/bin/poetry" export --without-hashes -f requirements.txt -o "$(pwd)/$sanitized_poetry_req" -C "$poetry_project_path"
+  done < "$POETRY_PROJECTS_FILE"
+fi
+
 echo
 echo "Phase 3: Installing requirement files (sanitized)"
+
+# First, sanitize traditional requirements files
 while IFS= read -r extra_file; do
   [[ -z "$extra_file" || "$extra_file" =~ ^# ]] && continue
   full_req_path="$REPO_ROOT/$extra_file"
@@ -71,11 +111,18 @@ while IFS= read -r extra_file; do
     echo "Skipping missing requirements file: $full_req_path"
     continue
   fi
-  sanitized_req="$SANITIZED_DIR/$(basename "$extra_file")"
+  sanitized_req="$SANITIZED_DIR/$(echo "$extra_file" | tr '/' '__')"
+  echo "Sanitizing requirements file: $full_req_path -> $sanitized_req"
   grep -vFf "$EXCLUDE_FILE" "$full_req_path" > "$sanitized_req"
-  echo "Installing sanitized requirements: $sanitized_req"
-  "${PIP_INSTALL_CMD[@]}" -r "$sanitized_req"
 done < "$EXTRA_REQUIREMENTS_FILE"
+
+# Then install all sanitized requirements files (includes both traditional and poetry-exported)
+for req_file in "$SANITIZED_DIR"/*; do
+  if [[ -f "$req_file" ]]; then
+    echo "Installing requirements: $req_file"
+    "${PIP_INSTALL_CMD[@]}" -r "$req_file"
+  fi
+done
 
 echo
 echo "Phase 4: Installing all projects in editable mode"
@@ -92,4 +139,4 @@ done
 
 echo "Venv setup complete: $VENV_DIR"
 echo "Run this to activate it:"
-echo "source \"$VENV_DIR/bin/activate\""
+echo "source $VENV_DIR/bin/activate"

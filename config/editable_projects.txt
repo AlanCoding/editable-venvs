@@ -1,4 +1,5 @@
 awx
+eda-server
 django-ansible-base:authentication,rest-filters,jwt_consumer,resource-registry,rbac,feature-flags,api-documentation,oauth2-provider
 awx_plugins.interfaces
 awx-plugins:credentials-github-app
