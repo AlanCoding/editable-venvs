@@ -35,18 +35,6 @@ if [[ -d "$VENV_DIR" ]]; then
   rm -rf sanitized/*
 fi
 
-# Setup poetry venv if it doesn't exist
-if [[ ! -d "$POETRY_VENV_DIR" ]]; then
-  echo "Phase 1: Creating poetry venv at: $POETRY_VENV_DIR"
-  $PYTHON -m venv "$POETRY_VENV_DIR" --clear
-  source "$POETRY_VENV_DIR/bin/activate"
-  python -m ensurepip --upgrade
-  pip install --quiet poetry
-  poetry self remove poetry-plugin-export
-  poetry self add poetry-plugin-export
-  deactivate
-fi
-
 echo
 echo "Phase 1: Creating clean venv at: $VENV_DIR"
 $PYTHON -m venv "$VENV_DIR" --clear
@@ -82,6 +70,19 @@ done < "$PROJECTS_FILE"
 if [[ -f "$POETRY_PROJECTS_FILE" ]]; then
   echo
   echo "Phase 2.5: Exporting poetry projects to requirements files"
+
+  # Setup poetry venv if it doesn't exist
+  if [[ ! -d "$POETRY_VENV_DIR" ]]; then
+    echo "Phase 1: Creating poetry venv at: $POETRY_VENV_DIR"
+    $PYTHON -m venv "$POETRY_VENV_DIR" --clear
+    source "$POETRY_VENV_DIR/bin/activate"
+    python -m ensurepip --upgrade
+    pip install --quiet poetry
+    poetry self remove poetry-plugin-export
+    poetry self add poetry-plugin-export
+    deactivate
+  fi
+
   while IFS= read -r poetry_project; do
     [[ -z "$poetry_project" || "$poetry_project" =~ ^# ]] && continue
     poetry_project_path="$REPO_ROOT/$poetry_project"
