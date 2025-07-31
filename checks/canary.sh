@@ -2,7 +2,7 @@
 set -euo pipefail
 
 REPO_ROOT="${REPO_ROOT:-$HOME/repos}"
-CHECK_FILTER="${1:-}"  # Optional arg: awx, dab, eda
+CHECK_FILTER="${1:-}"  # Optional arg: awx, dab, eda, gateway
 
 echo "🐤 Running canary tests..."
 
@@ -23,12 +23,23 @@ run_eda() {
   echo "🔎 eda-server"
   (
     cd "$REPO_ROOT/eda-server" &&
-    docker-compose -p eda \
-      -f tools/docker/docker-compose-dev.yaml \
-      up --detach postgres redis &&
+    docker-compose -p eda -f tools/docker/docker-compose-dev.yaml up --detach postgres redis &&
     DJANGO_SETTINGS_MODULE=aap_eda.settings.default EDA_SECRET_KEY=insecure EDA_DB_PASSWORD=secret \
       pytest tests/integration/api/test_eda_credential.py
   )
+}
+
+run_gateway() {
+    echo
+    echo "🔎 aap-gateway"
+    (
+        cd "$REPO_ROOT/aap-gateway" &&
+        docker compose -f tools/generated/docker-compose.yml up -d db redis1 &&
+        DATABASE_NAME=gateway DATABASE_USER=gateway DATABASE_PASSWORD=gateway DATABASE_HOST=localhost DATABASE_PORT=5440 \
+        REDIS_URL=redis://localhost:6379 REDIS_HOSTS=localhost:6379 REDIS_MODE=standalone \
+        GATEWAY_SECRET_KEY_FILE=tools/configs/dev_secret_key DJANGO_SETTINGS_MODULE=aap_gateway_api.settings \
+        pytest aap_gateway_api/tests/views/api/test_api_root.py
+    )
 }
 
 case "$CHECK_FILTER" in
@@ -36,6 +47,7 @@ case "$CHECK_FILTER" in
     run_awx
     run_dab
     run_eda
+    run_gateway
     ;;
   awx )
     run_awx
@@ -46,9 +58,12 @@ case "$CHECK_FILTER" in
   eda )
     run_eda
     ;;
+  gateway )
+    run_gateway
+    ;;
   * )
     echo "❌ Unknown check: $CHECK_FILTER"
-    echo "   Expected one of: awx, dab, eda"
+    echo "   Expected one of: awx, dab, eda, gateway"
     exit 1
     ;;
 esac
