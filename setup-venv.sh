@@ -58,7 +58,7 @@ while IFS= read -r line; do
   fi
 done < "$PROJECTS_FILE"
 
-echo "📄 Installing extra requirements from sanitized files"
+echo "📄 Pass 1: Installing requirement text files (sanitized)"
 while IFS= read -r extra_file; do
   [[ -z "$extra_file" || "$extra_file" =~ ^# ]] && continue
   full_req_path="$REPO_ROOT/$extra_file"
@@ -71,12 +71,6 @@ while IFS= read -r extra_file; do
   echo "📄 Installing sanitized requirements: $sanitized_req"
   "${PIP_INSTALL_CMD[@]}" -r "$sanitized_req"
 done < "$EXTRA_REQUIREMENTS_FILE"
-
-echo "🔄 Pass 1: Install all projects to resolve dependencies"
-for path in "${PROJECT_PATHS[@]}"; do
-  echo "➡️ Installing (non-editable): $path"
-  "${PIP_INSTALL_CMD[@]}" "$path"
-done
 
 echo "🛠 Pass 2: Re-install all projects in editable mode"
 for path in "${PROJECT_PATHS[@]}"; do

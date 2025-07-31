@@ -22,3 +22,16 @@ Set up clean, isolated virtual environments for multi-repo Python projects.
 PYTHON=python3.11 ./setup-venv.sh awx
 ```
 
+## Hacks and Notes
+
+The `projects.txt` is the most important file.
+This contains all of the folder locations (relate to the repo root)
+that should be installed as editable.
+
+This is necessarily an ordered list, and going in reverse-order of dependencies.
+That means that the most depended-on projects should come last.
+This is because the dependent projects are _very very_ likely to be listed
+as a pip dependency of other projects.
+Each entry in the file is `pip -e install`ed in order.
+Thus, the last entry will overwrite any installs of that same project
+from PyPI or any other given tag, pulled in from an earlier `-e` install.
