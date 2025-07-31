@@ -5,9 +5,11 @@ set -euo pipefail
 VENV_NAME="$1"
 REPO_ROOT="${REPO_ROOT:-$HOME/repos}"
 VENV_DIR="$HOME/venvs/$VENV_NAME"
-PROJECTS_FILE="editable_projects.txt"
-EXTRA_REQUIREMENTS_FILE="requirement_files.txt"
-EXCLUDE_FILE="exclude_for_files.txt"
+CONFIG_DIR="${CONFIG_DIR:-config}"
+PROJECTS_FILE="$CONFIG_DIR/editable_projects.txt"
+EXTRA_REQUIREMENTS_FILE="$CONFIG_DIR/requirement_files.txt"
+EXCLUDE_FILE="$CONFIG_DIR/exclude_for_files.txt"
+CONSTRAINTS_FILE="$CONFIG_DIR/constraints_for_editable.txt"
 SANITIZED_DIR="sanitized"
 PYTHON="${PYTHON:-python3}"
 
@@ -29,6 +31,7 @@ if [[ -d "$VENV_DIR" ]]; then
   rm -rf "$VENV_DIR"
 fi
 
+echo
 echo "Phase 1: Creating clean venv at: $VENV_DIR"
 $PYTHON -m venv "$VENV_DIR" --clear
 source "$VENV_DIR/bin/activate"
@@ -42,7 +45,8 @@ if [[ "$ACTUAL_PIP" != "$EXPECTED_PIP" ]]; then
   exit 1
 fi
 
-echo "Phase 2: Parsing editable_projects.txt (with optional extras)"
+echo
+echo "Phase 2: Parsing $PROJECTS_FILE (with optional extras)"
 PROJECT_PATHS=()
 declare -A EXTRAS_MAP
 
@@ -58,6 +62,7 @@ while IFS= read -r line; do
   fi
 done < "$PROJECTS_FILE"
 
+echo
 echo "Phase 3: Installing requirement files (sanitized)"
 while IFS= read -r extra_file; do
   [[ -z "$extra_file" || "$extra_file" =~ ^# ]] && continue
@@ -72,15 +77,16 @@ while IFS= read -r extra_file; do
   "${PIP_INSTALL_CMD[@]}" -r "$sanitized_req"
 done < "$EXTRA_REQUIREMENTS_FILE"
 
+echo
 echo "Phase 4: Installing all projects in editable mode"
 for path in "${PROJECT_PATHS[@]}"; do
   if [[ -n "${EXTRAS_MAP[$path]+x}" ]]; then
     extras="${EXTRAS_MAP[$path]}"
     echo "Installing as editable with extras [$extras]: $path"
-    "${PIP_INSTALL_CMD[@]}" -e "$path[$extras]" -c constraints_for_editable.txt
+    "${PIP_INSTALL_CMD[@]}" -e "$path[$extras]" -c "$CONSTRAINTS_FILE"
   else
     echo "Installing as editable: $path"
-    "${PIP_INSTALL_CMD[@]}" -e "$path" -c constraints_for_editable.txt
+    "${PIP_INSTALL_CMD[@]}" -e "$path" -c "$CONSTRAINTS_FILE"
   fi
 done
 

@@ -25,23 +25,23 @@ Creates a clean, isolated virtual environment at `~/venvs/<venv-name>` containin
 4. **Environment Activation**: Activates the new virtual environment and verifies pip is correctly configured
 
 ### Phase 2: Project Discovery
-5. **Project Parsing**: Reads `editable_projects.txt` and extracts:
+5. **Project Parsing**: Reads `config/editable_projects.txt` and extracts:
    - Project directory paths (relative to `$REPO_ROOT`)
    - Optional package extras (e.g., `project:extra1,extra2`)
    - Validates all project directories exist
 
 ### Phase 3: Dependency Installation
-6. **Requirements Sanitization**: For each file listed in `requirement_files.txt`:
+6. **Requirements Sanitization**: For each file listed in `config/requirement_files.txt`:
    - Reads the requirements file
-   - Filters out blacklisted packages using `exclude_for_files.txt`
+   - Filters out blacklisted packages using `config/exclude_for_files.txt`
    - Creates cleaned versions in `sanitized/` directory
    - Installs the sanitized requirements
 
 ### Phase 4: Editable Project Installation
-7. **Editable Installation**: Installs each project from `editable_projects.txt` in editable mode:
+7. **Editable Installation**: Installs each project from `config/editable_projects.txt` in editable mode:
    - Uses `pip install -e` for live code editing
    - Applies any specified package extras
-   - Enforces version constraints from `constraints_for_editable.txt`
+   - Enforces version constraints from `config/constraints_for_editable.txt`
    - Processes projects in dependency order (dependencies last to override PyPI versions)
 
 ## Usage
@@ -53,6 +53,13 @@ PYTHON=python3.11 ./create_venv.sh awx
 # With custom repo location
 REPO_ROOT=/custom/path ./create_venv.sh my-env
 
+# With custom config directory
+CONFIG_DIR=/path/to/configs ./create_venv.sh awx
+
+# Multiple config environments
+CONFIG_DIR=config/production ./create_venv.sh prod-env
+CONFIG_DIR=config/development ./create_venv.sh dev-env
+
 # Loud installation
 PIP_QUIET=0 ./create_venv.sh awx
 ```
@@ -62,12 +69,34 @@ After completion, activate the environment:
 source ~/venvs/awx/bin/activate
 ```
 
+## Project Structure
+
+```
+editable-venvs/
+├── create_venv.sh                    # Main script
+├── config/                           # Configuration files
+│   ├── editable_projects.txt         # Projects to install in editable mode
+│   ├── requirement_files.txt         # Additional requirements files to install
+│   ├── exclude_for_files.txt         # Packages to exclude during installation
+│   └── constraints_for_editable.txt  # Version constraints for editable installs
+├── checks/                           # Verification tools
+├── sanitized/                        # Generated filtered requirements files
+└── README.md
+```
+
 ## Configuration Files
 
-- **`editable_projects.txt`**: Ordered list of project directories to install in editable mode
-- **`requirement_files.txt`**: Additional requirements files to install before projects
-- **`exclude_for_files.txt`**: Packages to exclude during requirements installation
-- **`constraints_for_editable.txt`**: Version constraints to apply during installation
+- **`config/editable_projects.txt`**: Ordered list of project directories to install in editable mode
+- **`config/requirement_files.txt`**: Additional requirements files to install before projects
+- **`config/exclude_for_files.txt`**: Packages to exclude during requirements installation
+- **`config/constraints_for_editable.txt`**: Version constraints to apply during installation
+
+## Environment Variables
+
+- **`CONFIG_DIR`**: Directory containing configuration files (default: `config`)
+- **`REPO_ROOT`**: Root directory containing all project repositories (default: `$HOME/repos`)
+- **`PYTHON`**: Python interpreter to use (default: `python3`)
+- **`PIP_QUIET`**: Enable quiet pip installation (default: `1`)
 
 ## Verification Tools
 
@@ -77,7 +106,7 @@ source ~/venvs/awx/bin/activate
 ## Key Considerations
 
 ### Dependency Order Matters
-Projects in `editable_projects.txt` are listed in reverse dependency order. The most fundamental projects (that others depend on) come last. This ensures that when projects are installed in editable mode, the final editable installation overwrites any PyPI versions that may have been pulled in as dependencies.
+Projects in `config/editable_projects.txt` are listed in reverse dependency order. The most fundamental projects (that others depend on) come last. This ensures that when projects are installed in editable mode, the final editable installation overwrites any PyPI versions that may have been pulled in as dependencies.
 
 ### Two-Phase Installation Strategy
 The script uses a two-phase approach:

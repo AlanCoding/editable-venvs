@@ -2,7 +2,8 @@
 set -euo pipefail
 
 REPO_ROOT="${REPO_ROOT:-$HOME/repos}"
-PROJECTS_FILE="${1:-editable_projects.txt}"
+CONFIG_DIR="${CONFIG_DIR:-config}"
+PROJECTS_FILE="${1:-$CONFIG_DIR/editable_projects.txt}"
 FETCH_TIMEOUT="${FETCH_TIMEOUT:-1}"
 REMOTE_NAME="${REMOTE_NAME:-ansible}"
 
