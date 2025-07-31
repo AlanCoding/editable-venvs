@@ -1,4 +1,4 @@
-# These are packages excluded when installing things from extra.txt listings
+# These are packages excluded when installing things from requirement_files.txt listings
 # those are pip install -r <file> installs
 # we can not install legit dependencies from a project editable install without abandoning dep resolution completely
 pip
