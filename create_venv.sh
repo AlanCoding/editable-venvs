@@ -5,7 +5,7 @@ set -euo pipefail
 VENV_NAME="$1"
 REPO_ROOT="${REPO_ROOT:-$HOME/repos}"
 VENV_DIR="$HOME/venvs/$VENV_NAME"
-POETRY_VENV_DIR="$HOME/venvs/poetry"
+BUILD_VENV_DIR="$HOME/venvs/build"
 CONFIG_DIR="${CONFIG_DIR:-config}"
 PROJECTS_FILE="$CONFIG_DIR/editable_projects.txt"
 POETRY_PROJECTS_FILE="$CONFIG_DIR/poetry_projects.txt"
@@ -69,21 +69,21 @@ while IFS= read -r line; do
 done < "$PROJECTS_FILE"
 
 echo
-echo "Phase 2.4: Setting up poetry venv with required tools"
+echo "Phase 2.4: Setting up build venv with required tools"
 
-# Setup poetry venv (needed for both poetry exports and pip-compile)
-if [[ ! -d "$POETRY_VENV_DIR" ]]; then
-  echo "Creating poetry venv at: $POETRY_VENV_DIR"
-  $PYTHON -m venv "$POETRY_VENV_DIR" --clear
-  source "$POETRY_VENV_DIR/bin/activate"
+# Setup build venv (needed for both poetry exports and pip-compile)
+if [[ ! -d "$BUILD_VENV_DIR" ]]; then
+  echo "Creating build venv at: $BUILD_VENV_DIR"
+  $PYTHON -m venv "$BUILD_VENV_DIR" --clear
+  source "$BUILD_VENV_DIR/bin/activate"
   python -m ensurepip --upgrade
   pip install --quiet poetry pip-tools
   poetry self remove poetry-plugin-export
   poetry self add poetry-plugin-export
   deactivate
-elif [[ ! -f "$POETRY_VENV_DIR/bin/pip-compile" ]]; then
-  echo "Installing pip-tools in existing poetry venv"
-  "$POETRY_VENV_DIR/bin/pip" install --quiet pip-tools
+elif [[ ! -f "$BUILD_VENV_DIR/bin/pip-compile" ]]; then
+  echo "Installing pip-tools in existing build venv"
+  "$BUILD_VENV_DIR/bin/pip" install --quiet pip-tools
 fi
 
 # Phase 2.5: Export poetry projects to requirements files
@@ -105,7 +105,7 @@ if [[ -f "$POETRY_PROJECTS_FILE" ]]; then
 
     sanitized_poetry_req="$SANITIZED_DIR/$(basename "$poetry_project").txt"
     echo "Exporting poetry project $poetry_project to: $sanitized_poetry_req"
-    "$POETRY_VENV_DIR/bin/poetry" export --without-hashes -f requirements.txt -o "$(pwd)/$sanitized_poetry_req" -C "$poetry_project_path"
+    "$BUILD_VENV_DIR/bin/poetry" export --without-hashes -f requirements.txt -o "$(pwd)/$sanitized_poetry_req" -C "$poetry_project_path"
   done < "$POETRY_PROJECTS_FILE"
 fi
 
@@ -136,7 +136,7 @@ for path in "${PROJECT_PATHS[@]}"; do
   echo "  Using setup file: $setup_file"
   
   # Build pip-compile command with extras if needed
-  pip_compile_cmd=("$POETRY_VENV_DIR/bin/pip-compile" --resolver=backtracking --no-strip-extras -o "$temp_req_file" "$setup_file" --quiet)
+  pip_compile_cmd=("$BUILD_VENV_DIR/bin/pip-compile" --resolver=backtracking --no-strip-extras -o "$temp_req_file" "$setup_file" --quiet)
   
   if [[ -n "${EXTRAS_MAP[$path]+x}" ]]; then
     extras="${EXTRAS_MAP[$path]}"

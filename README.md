@@ -34,14 +34,14 @@ Creates a clean, isolated virtual environment at `~/venvs/<venv-name>` containin
    - Validates all project directories exist
 
 ### Phase 2.4: Tool Environment Setup
-6. **Poetry Environment Setup**: Creates a dedicated poetry venv at `~/venvs/poetry` if it doesn't exist
+6. **Build Environment Setup**: Creates a dedicated build venv at `~/venvs/build` (auto-created if it doesn't exist)
    - Installs both `poetry` and `pip-tools` for dependency management
    - Sets up poetry plugin for exporting requirements
 
 ### Phase 2.5: Poetry Export
 7. **Poetry Requirements Export**: For each project listed in `config/poetry_projects.txt`:
    - Validates the project directory exists and contains `pyproject.toml`
-   - Uses the dedicated poetry venv to export dependencies
+   - Uses the dedicated build venv to export dependencies
    - Creates requirements files in `sanitized/` directory using `poetry export`
 
 ### Phase 2.6: Editable Project Requirements Generation
@@ -157,7 +157,7 @@ Projects in `config/editable_projects.txt` are listed in reverse dependency orde
 
 ### Multi-Phase Installation Strategy
 The script uses a sophisticated multi-phase approach:
-1. **Tool Setup Phase**: Create dedicated environment with Poetry and pip-tools
+1. **Tool Setup Phase**: Create dedicated build environment with Poetry and pip-tools (auto-created at `~/venvs/build`)
 2. **Requirements Generation Phase**: 
    - Export dependencies from Poetry projects using `poetry export`
    - Generate requirements from editable projects using `pip-compile` with proper extras support
@@ -173,6 +173,6 @@ This approach ensures clean dependency resolution by separating dependency disco
   - pip-compile generated requirements files from editable projects
   - Sanitized traditional requirements files
 - **`~/venvs/<venv-name>/`**: The created virtual environment
-- **`~/venvs/poetry/`**: Dedicated environment with Poetry and pip-tools
+- **`~/venvs/build/`**: Dedicated build environment with Poetry and pip-tools (auto-created)
 - **`freezes/`**: Historical snapshots of installed packages
 - **`snapshots/`**: Project-specific package snapshots
