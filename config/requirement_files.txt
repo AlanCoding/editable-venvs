@@ -1,3 +1,4 @@
-awx/requirements/requirements.in
-awx/requirements/requirements_dev.txt
+tower/requirements/requirements.txt
+tower/requirements/requirements_dev.txt
 django-ansible-base/requirements/requirements_dev.txt
+django-ansible-base/requirements/requirements_all.txt

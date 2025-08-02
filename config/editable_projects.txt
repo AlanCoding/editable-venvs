@@ -1,4 +1,4 @@
-awx
+tower
 eda-server
 aap-gateway
 django-ansible-base:authentication,rest-filters,jwt_consumer,resource-registry,rbac,feature-flags,api-documentation,oauth2-provider

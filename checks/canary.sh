@@ -9,7 +9,7 @@ echo "🐤 Running canary tests..."
 run_awx() {
   echo
   echo "🔎 AWX"
-  (cd "$REPO_ROOT/awx" && pytest awx/main/tests/functional/test_instances.py)
+  (cd "$REPO_ROOT/tower" && pytest awx/main/tests/functional/test_instances.py --create-db)
 }
 
 run_dab() {

@@ -10,3 +10,9 @@ pkgconfig
 # DAB lists the oauth lib as a direct dependency
 # this avoids installing from AWX requirements
 django-oauth-toolkit
+# this is a dev requirement (we do not need) that imports cgi
+# this will trigger a warning that fails AWX tests
+coreapi
+# the version pinned in several places of xmlsec will not install
+# so this is listed in the pre_requirements.txt manually
+xmlsec
