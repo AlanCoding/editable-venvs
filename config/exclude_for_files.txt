@@ -16,3 +16,10 @@ coreapi
 # the version pinned in several places of xmlsec will not install
 # so this is listed in the pre_requirements.txt manually
 xmlsec
+# HACK: take control of protobuf ecosystem because AWX & aap-gateway give different values
+# if not done, the opentelemetry libs in tower will fail at runtime
+protobuf
+googleapis-common-protos
+opentelemetry-proto
+grpcio-tools
+xds-protos

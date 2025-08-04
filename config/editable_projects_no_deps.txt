@@ -1,0 +1,5 @@
+# Projects to install in editable mode with --no-deps
+# Each project listed here MUST have its requirements file included in requirement_files.txt
+# Dependencies will be installed from explicit requirements files, not via pip-compile resolution 
+django-ansible-base:authentication,rest-filters,jwt_consumer,resource-registry,rbac,feature-flags,api-documentation,oauth2-provider
+aap-gateway

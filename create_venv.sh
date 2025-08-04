@@ -8,6 +8,7 @@ VENV_DIR="$HOME/venvs/$VENV_NAME"
 BUILD_VENV_DIR="$HOME/venvs/build"
 CONFIG_DIR="${CONFIG_DIR:-config}"
 PROJECTS_FILE="$CONFIG_DIR/editable_projects.txt"
+NO_DEPS_PROJECTS_FILE="$CONFIG_DIR/editable_projects_no_deps.txt"
 POETRY_PROJECTS_FILE="$CONFIG_DIR/poetry_projects.txt"
 PRE_REQUIREMENTS_FILE="$CONFIG_DIR/pre_requirements.txt"
 EXTRA_REQUIREMENTS_FILE="$CONFIG_DIR/requirement_files.txt"
@@ -25,7 +26,7 @@ fi
 
 mkdir -p "$SANITIZED_DIR"
 
-[[ -f "$PROJECTS_FILE" ]] || { echo "❌ Missing $PROJECTS_FILE"; exit 1; }
+# Both PROJECTS_FILE and NO_DEPS_PROJECTS_FILE are optional, but at least one should exist
 [[ -f "$EXCLUDE_FILE" ]] || { echo "❌ Missing $EXCLUDE_FILE"; exit 1; }
 [[ -f "$EXTRA_REQUIREMENTS_FILE" ]] || { echo "❌ Missing $EXTRA_REQUIREMENTS_FILE"; exit 1; }
 # PRE_REQUIREMENTS_FILE is optional, no validation required
@@ -52,38 +53,63 @@ if [[ "$ACTUAL_PIP" != "$EXPECTED_PIP" ]]; then
 fi
 
 echo
-echo "Phase 2: Parsing $PROJECTS_FILE (with optional extras)"
+echo "Phase 2: Parsing editable projects files"
+
+# Parse projects that install with dependencies (normal pip behavior)
 PROJECT_PATHS=()
 declare -A EXTRAS_MAP
 
-while IFS= read -r line; do
-  [[ -z "$line" || "$line" =~ ^# ]] && continue
-  path_part="${line%%:*}"
-  extras_part="${line#*:}"
-  full_path="$REPO_ROOT/$path_part"
-  [[ -d "$full_path" ]] || { echo "❌ Missing project directory: $full_path"; exit 1; }
-  PROJECT_PATHS+=("$full_path")
-  if [[ "$extras_part" != "$path_part" ]]; then
-    EXTRAS_MAP["$full_path"]="$extras_part"
-  fi
-done < "$PROJECTS_FILE"
+if [[ -f "$PROJECTS_FILE" ]]; then
+  echo "  Parsing $PROJECTS_FILE (install with dependencies)"
+  while IFS= read -r line; do
+    [[ -z "$line" || "$line" =~ ^# ]] && continue
+    path_part="${line%%:*}"
+    extras_part="${line#*:}"
+    full_path="$REPO_ROOT/$path_part"
+    [[ -d "$full_path" ]] || { echo "❌ Missing project directory: $full_path"; exit 1; }
+    PROJECT_PATHS+=("$full_path")
+    if [[ "$extras_part" != "$path_part" ]]; then
+      EXTRAS_MAP["$full_path"]="$extras_part"
+    fi
+  done < "$PROJECTS_FILE"
+fi
+
+# Parse projects that install with --no-deps (must provide explicit requirements files)
+NO_DEPS_PROJECT_PATHS=()
+declare -A NO_DEPS_EXTRAS_MAP
+
+if [[ -f "$NO_DEPS_PROJECTS_FILE" ]]; then
+  echo "  Parsing $NO_DEPS_PROJECTS_FILE (install with --no-deps, explicit requirements)"
+  while IFS= read -r line; do
+    [[ -z "$line" || "$line" =~ ^# ]] && continue
+    path_part="${line%%:*}"
+    extras_part="${line#*:}"
+    full_path="$REPO_ROOT/$path_part"
+    [[ -d "$full_path" ]] || { echo "❌ Missing project directory: $full_path"; exit 1; }
+    NO_DEPS_PROJECT_PATHS+=("$full_path")
+    if [[ "$extras_part" != "$path_part" ]]; then
+      NO_DEPS_EXTRAS_MAP["$full_path"]="$extras_part"
+    fi
+  done < "$NO_DEPS_PROJECTS_FILE"
+fi
 
 echo
 echo "Phase 2.4: Setting up build venv with required tools"
 
-# Setup build venv (needed for both poetry exports and pip-compile)
-if [[ ! -d "$BUILD_VENV_DIR" ]]; then
-  echo "Creating build venv at: $BUILD_VENV_DIR"
-  $PYTHON -m venv "$BUILD_VENV_DIR" --clear
-  source "$BUILD_VENV_DIR/bin/activate"
-  python -m ensurepip --upgrade
-  pip install --quiet poetry pip-tools
-  poetry self remove poetry-plugin-export
-  poetry self add poetry-plugin-export
-  deactivate
-elif [[ ! -f "$BUILD_VENV_DIR/bin/pip-compile" ]]; then
-  echo "Installing pip-tools in existing build venv"
-  "$BUILD_VENV_DIR/bin/pip" install --quiet pip-tools
+# Setup build venv (only for poetry exports if needed)
+if [[ -f "$POETRY_PROJECTS_FILE" ]] && [[ $(grep -v '^#' "$POETRY_PROJECTS_FILE" | grep -v '^[[:space:]]*$' | wc -l) -gt 0 ]]; then
+  if [[ ! -d "$BUILD_VENV_DIR" ]]; then
+    echo "Creating build venv for poetry exports at: $BUILD_VENV_DIR"
+    $PYTHON -m venv "$BUILD_VENV_DIR" --clear
+    source "$BUILD_VENV_DIR/bin/activate"
+    python -m ensurepip --upgrade
+    pip install --quiet poetry
+    poetry self remove poetry-plugin-export
+    poetry self add poetry-plugin-export
+    deactivate
+  fi
+else
+  echo "No poetry projects configured, skipping build venv setup"
 fi
 
 # Phase 2.5: Export poetry projects to requirements files
@@ -109,63 +135,11 @@ if [[ -f "$POETRY_PROJECTS_FILE" ]]; then
   done < "$POETRY_PROJECTS_FILE"
 fi
 
+# Phase 2.6: pip-compile generation completely eliminated
+# All editable projects now use explicit requirements files from requirement_files.txt
 echo
-echo "Phase 2.6: Generating requirements files from editable projects using pip-compile"
-
-# For each editable project, generate a requirements file with its dependencies
-for path in "${PROJECT_PATHS[@]}"; do
-  project_name=$(basename "$path")
-  temp_req_file="$SANITIZED_DIR/temp_${project_name}.txt"
-  sanitized_editable_req="$SANITIZED_DIR/editable_${project_name}.txt"
-  
-  echo "Generating requirements for editable project: $path"
-  
-  # Find the setup file algorithmically
-  setup_file=""
-  if [[ -f "$path/pyproject.toml" ]]; then
-    setup_file="$path/pyproject.toml"
-  elif [[ -f "$path/setup.py" ]]; then
-    setup_file="$path/setup.py"
-  elif [[ -f "$path/setup.cfg" ]]; then
-    setup_file="$path/setup.cfg"
-  else
-    echo "  Error: No setup file found (pyproject.toml, setup.py, or setup.cfg) in $path"
-    exit 1
-  fi
-  
-  echo "  Using setup file: $setup_file"
-  
-  # Build pip-compile command with extras if needed
-  pip_compile_cmd=("$BUILD_VENV_DIR/bin/pip-compile" --resolver=backtracking --no-strip-extras -o "$temp_req_file" "$setup_file" --quiet)
-  
-  if [[ -n "${EXTRAS_MAP[$path]+x}" ]]; then
-    extras="${EXTRAS_MAP[$path]}"
-    echo "  Processing with extras [$extras]"
-    # Split extras by comma and add --extra for each
-    IFS=',' read -ra EXTRA_ARRAY <<< "$extras"
-    for extra in "${EXTRA_ARRAY[@]}"; do
-      # Trim whitespace
-      extra=$(echo "$extra" | xargs)
-      pip_compile_cmd+=(--extra "$extra")
-    done
-  fi
-  
-  # Use pip-compile to generate requirements
-  echo "  Running pip-compile command: ${pip_compile_cmd[*]}"
-  "${pip_compile_cmd[@]}"
-  
-  # Remove the editable project line and apply sanitization rules
-  echo "  Applying sanitization rules..."
-  grep -v "^-e " "$temp_req_file" | grep -v "^# " | grep -vFf "$EXCLUDE_FILE" > "$sanitized_editable_req" 2>/dev/null || {
-    # If no dependencies remain after filtering, create empty file
-    touch "$sanitized_editable_req"
-  }
-  
-  echo "  Generated requirements file: $sanitized_editable_req"
-  
-  # Clean up temporary files
-  rm -f "$temp_req_file"
-done
+echo "Phase 2.6: pip-compile dependency resolution eliminated"
+echo "  All dependencies will be installed from explicit requirements files"
 
 echo
 echo "Phase 2.75: Installing pre-requirements (direct, no exclusions)"
@@ -210,17 +184,37 @@ for req_file in $(find "$SANITIZED_DIR" -maxdepth 1 -type f | sort); do
 done
 
 echo
-echo "Phase 4: Installing all projects in editable mode without dependencies"
-for path in "${PROJECT_PATHS[@]}"; do
-  if [[ -n "${EXTRAS_MAP[$path]+x}" ]]; then
-    extras="${EXTRAS_MAP[$path]}"
-    echo "Installing as editable with extras [$extras] (no-deps): $path"
-    "${PIP_INSTALL_CMD[@]}" -e "$path[$extras]" -c "$CONSTRAINTS_FILE" --no-deps
-  else
-    echo "Installing as editable (no-deps): $path"
-    "${PIP_INSTALL_CMD[@]}" -e "$path" -c "$CONSTRAINTS_FILE" --no-deps
-  fi
-done
+echo "Phase 4: Installing all projects in editable mode"
+
+# Install projects with dependencies (normal pip behavior)
+if [[ ${#PROJECT_PATHS[@]} -gt 0 ]]; then
+  echo "  Installing projects with dependencies:"
+  for path in "${PROJECT_PATHS[@]}"; do
+    if [[ -n "${EXTRAS_MAP[$path]+x}" ]]; then
+      extras="${EXTRAS_MAP[$path]}"
+      echo "    Installing as editable with extras [$extras] (with deps): $path"
+      "${PIP_INSTALL_CMD[@]}" -e "$path[$extras]" -c "$CONSTRAINTS_FILE"
+    else
+      echo "    Installing as editable (with deps): $path"
+      "${PIP_INSTALL_CMD[@]}" -e "$path" -c "$CONSTRAINTS_FILE"
+    fi
+  done
+fi
+
+# Install no-deps projects (dependencies already installed from requirements files)
+if [[ ${#NO_DEPS_PROJECT_PATHS[@]} -gt 0 ]]; then
+  echo "  Installing no-deps projects (dependencies from explicit requirements files):"
+  for path in "${NO_DEPS_PROJECT_PATHS[@]}"; do
+    if [[ -n "${NO_DEPS_EXTRAS_MAP[$path]+x}" ]]; then
+      extras="${NO_DEPS_EXTRAS_MAP[$path]}"
+      echo "    Installing as editable with extras [$extras] (no-deps): $path"
+      "${PIP_INSTALL_CMD[@]}" -e "$path[$extras]" -c "$CONSTRAINTS_FILE" --no-deps
+    else
+      echo "    Installing as editable (no-deps): $path"
+      "${PIP_INSTALL_CMD[@]}" -e "$path" -c "$CONSTRAINTS_FILE" --no-deps
+    fi
+  done
+fi
 
 echo "Venv setup complete: $VENV_DIR"
 echo "Run this to activate it:"

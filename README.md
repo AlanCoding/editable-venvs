@@ -11,12 +11,12 @@ This tool addresses the challenge of running unit tests across multiple interdep
 ## What It Does
 
 Creates a clean, isolated virtual environment at `~/venvs/<venv-name>` containing:
-- **Editable installations** of all specified projects (allowing live code editing)
-- **pip-compile generated requirements** from each editable project with proper extras support
+- **Two types of editable installations**:
+  - Projects with dependencies (normal pip behavior)
+  - Projects with explicit requirements files (installed with --no-deps)
 - **Poetry-exported dependencies** from projects using Poetry
 - **Sanitized dependencies** from additional requirements files
-- **Proper dependency resolution** across multiple repositories
-- **Isolated dependency installation** using --no-deps to avoid conflicts
+- **Proper dependency resolution** without pip-compile conflicts
 - **Reproducible environment** for consistent test execution
 
 ## How create_venv.sh Works (Step-by-Step)
@@ -28,15 +28,17 @@ Creates a clean, isolated virtual environment at `~/venvs/<venv-name>` containin
 4. **Environment Activation**: Activates the new virtual environment and verifies pip is correctly configured
 
 ### Phase 2: Project Discovery
-5. **Project Parsing**: Reads `config/editable_projects.txt` and extracts:
-   - Project directory paths (relative to `$REPO_ROOT`)
-   - Optional package extras (e.g., `project:extra1,extra2`)
+5. **Dual Project Parsing**: Reads both editable project configuration files:
+   - `config/editable_projects.txt`: Projects installed with dependencies (normal pip behavior)
+   - `config/editable_projects_no_deps.txt`: Projects installed with --no-deps (must provide requirements files)
+   - Extracts project directory paths and optional package extras
    - Validates all project directories exist
 
 ### Phase 2.4: Tool Environment Setup
-6. **Build Environment Setup**: Creates a dedicated build venv at `~/venvs/build` (auto-created if it doesn't exist)
-   - Installs both `poetry` and `pip-tools` for dependency management
-   - Sets up poetry plugin for exporting requirements
+6. **Conditional Build Environment**: Creates build venv only if needed:
+   - Installs `poetry` only if there are Poetry projects to export
+   - **No pip-tools installation** - pip-compile has been completely eliminated
+   - Skips build environment entirely if no build tools are needed
 
 ### Phase 2.5: Poetry Export
 7. **Poetry Requirements Export**: For each project listed in `config/poetry_projects.txt`:
@@ -44,21 +46,17 @@ Creates a clean, isolated virtual environment at `~/venvs/<venv-name>` containin
    - Uses the dedicated build venv to export dependencies
    - Creates requirements files in `sanitized/` directory using `poetry export`
 
-### Phase 2.6: Editable Project Requirements Generation
-8. **pip-compile Requirements Generation**: For each editable project:
-   - Detects the appropriate setup file (`pyproject.toml`, `setup.py`, or `setup.cfg`)
-   - Uses `pip-compile` with `--resolver=backtracking` to resolve all dependencies
-   - Applies any configured extras using `--extra` flags
-   - Filters out the editable project itself and applies sanitization rules
-   - Creates sanitized requirements files in `sanitized/` directory
+### Phase 2.6: pip-compile Elimination
+8. **No Dependency Generation**: pip-compile has been completely eliminated
+   - No automatic dependency resolution from project setup files
+   - All dependencies come from explicit requirements files or normal pip resolution
+   - Eliminates version conflicts between pip-compile output and explicit requirements
 
 ### Phase 2.75: Pre-Requirements Installation
 9. **Direct Requirements Installation**: Installs packages listed in `config/pre_requirements.txt`:
    - Installs requirements directly without any filtering or exclusions
    - Runs before sanitized requirements to ensure early availability
    - Bypasses the exclusion list in `config/exclude_for_files.txt`
-   - Useful for critical dependencies that must not be filtered
-   - Uses standard pip requirements format (package names and versions)
 
 ### Phase 3: Dependency Installation
 10. **Requirements Sanitization**: For each file listed in `config/requirement_files.txt`:
@@ -66,17 +64,15 @@ Creates a clean, isolated virtual environment at `~/venvs/<venv-name>` containin
     - Filters out blacklisted packages using `config/exclude_for_files.txt`
     - Creates cleaned versions in `sanitized/` directory
 11. **Sanitized Requirements Installation**: Installs all sanitized requirements files:
-    - **Development files** (`*_dev.txt`): Installed with dependencies to support dev tools
-    - **Other files**: Installed with `--no-deps` to prevent dependency conflicts
+    - **Development files** (`*_dev.txt`): Installed with dependencies
+    - **Other files**: Installed with `--no-deps` to prevent conflicts
     - **Poetry-exported files**: Installed with `--no-deps` as dependencies are pre-resolved
-    - **pip-compile generated files**: Installed with `--no-deps` as dependencies are pre-resolved
 
 ### Phase 4: Editable Project Installation
-12. **Editable Installation**: Installs each project from `config/editable_projects.txt` in editable mode:
-    - Uses `pip install -e` with `--no-deps` for live code editing
-    - Applies any specified package extras during installation
-    - Enforces version constraints from `config/constraints_for_editable.txt`
-    - Dependencies already installed in Phase 3, so no conflicts occur
+12. **Dual Installation Strategy**: 
+    - **Projects with dependencies**: Installed from `config/editable_projects.txt` using normal pip behavior (with dependencies)
+    - **No-deps projects**: Installed from `config/editable_projects_no_deps.txt` with `--no-deps` (dependencies already installed from explicit requirements files)
+    - Both types support package extras and apply version constraints from `config/constraints_for_editable.txt`
 
 ## Usage
 
@@ -109,7 +105,8 @@ source ~/venvs/awx/bin/activate
 editable-venvs/
 ├── create_venv.sh                    # Main script
 ├── config/                           # Configuration files
-│   ├── editable_projects.txt         # Projects to install in editable mode
+│   ├── editable_projects.txt         # Projects to install with dependencies
+│   ├── editable_projects_no_deps.txt # Projects to install with --no-deps
 │   ├── poetry_projects.txt           # Projects using Poetry (for export)
 │   ├── pre_requirements.txt          # Requirements to install directly (no exclusions)
 │   ├── requirement_files.txt         # Additional requirements files to install
@@ -117,12 +114,25 @@ editable-venvs/
 │   └── constraints_for_editable.txt  # Version constraints for editable installs
 ├── checks/                           # Verification tools
 ├── sanitized/                        # Generated filtered requirements files
+├── notes/                            # Documentation and migration notes
 └── README.md
 ```
 
 ## Configuration Files
 
-- **`config/editable_projects.txt`**: Ordered list of project directories to install in editable mode
+### Editable Projects Configuration
+
+- **`config/editable_projects.txt`**: Projects installed with dependencies using normal pip behavior
+  - Use for projects that work well with standard Python packaging dependency resolution
+  - Dependencies are resolved automatically by pip during installation
+
+- **`config/editable_projects_no_deps.txt`**: Projects installed with `--no-deps` 
+  - Use for projects that need explicit version control via requirements files
+  - **Must** include their requirements files in `config/requirement_files.txt`
+  - Dependencies installed from explicit requirements files with pinned versions
+
+### Other Configuration Files
+
 - **`config/poetry_projects.txt`**: Projects using Poetry whose dependencies should be exported via `poetry export`
 - **`config/requirement_files.txt`**: Additional requirements files to install before projects
 - **`config/exclude_for_files.txt`**: Packages to exclude during requirements installation
@@ -139,7 +149,7 @@ editable-venvs/
 
 The tool automatically handles projects that use Poetry for dependency management:
 
-1. **Dedicated Poetry Environment**: Creates `~/venvs/poetry` with Poetry installed
+1. **Conditional Poetry Environment**: Creates `~/venvs/build` only if Poetry projects exist
 2. **Automatic Export**: Uses `poetry export` to generate requirements.txt files
 3. **Seamless Integration**: Poetry-exported dependencies are installed alongside other requirements
 
@@ -152,27 +162,37 @@ Poetry projects are listed in `config/poetry_projects.txt` (one per line) and mu
 
 ## Key Considerations
 
+### Two Installation Strategies
+
+**Projects with Dependencies (`editable_projects.txt`)**:
+- Use standard Python packaging dependency resolution
+- Good for projects with stable, well-defined dependencies
+- Dependencies resolved automatically during installation
+
+**No-Deps Projects (`editable_projects_no_deps.txt`)**:
+- Require explicit requirements files for dependency management
+- Provide precise version control through pinned requirements
+- Prevent pip-compile style conflicts with carefully maintained version pins
+- Must include requirements files in `config/requirement_files.txt`
+
 ### Dependency Order Matters
-Projects in `config/editable_projects.txt` are listed in reverse dependency order. The most fundamental projects (that others depend on) come last. This ensures that when projects are installed in editable mode, the final editable installation overwrites any PyPI versions that may have been pulled in as dependencies.
+Projects in configuration files should be listed considering dependency relationships. More fundamental projects (that others depend on) should be considered when determining installation order.
 
 ### Multi-Phase Installation Strategy
 The script uses a sophisticated multi-phase approach:
-1. **Tool Setup Phase**: Create dedicated build environment with Poetry and pip-tools (auto-created at `~/venvs/build`)
-2. **Requirements Generation Phase**: 
-   - Export dependencies from Poetry projects using `poetry export`
-   - Generate requirements from editable projects using `pip-compile` with proper extras support
-3. **Dependency Resolution Phase**: Install all dependencies using `--no-deps` to prevent conflicts
-4. **Editable Installation Phase**: Install projects in editable mode without dependencies
+1. **Conditional Tool Setup**: Create build environment only if Poetry projects exist
+2. **Requirements Generation**: Export dependencies from Poetry projects only
+3. **Dependency Resolution**: Install all dependencies from explicit requirements files
+4. **Dual Editable Installation**: Install projects using appropriate strategy (with or without deps)
 
-This approach ensures clean dependency resolution by separating dependency discovery from installation, while maintaining the ability to edit code and run tests across all projects simultaneously. The use of `--no-deps` prevents pip from second-guessing the carefully resolved dependency tree.
+This approach ensures clean dependency resolution by separating dependency discovery from installation, while providing flexibility in how dependencies are managed per project.
 
 ## Generated Artifacts
 
 - **`sanitized/`**: Contains filtered requirements files for debugging including:
   - Poetry-exported requirements files
-  - pip-compile generated requirements files from editable projects
-  - Sanitized traditional requirements files
+  - Sanitized traditional requirements files  
 - **`~/venvs/<venv-name>/`**: The created virtual environment
-- **`~/venvs/build/`**: Dedicated build environment with Poetry and pip-tools (auto-created)
+- **`~/venvs/build/`**: Conditional build environment (only if Poetry projects exist)
 - **`freezes/`**: Historical snapshots of installed packages
 - **`snapshots/`**: Project-specific package snapshots
