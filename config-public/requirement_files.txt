@@ -1,0 +1,4 @@
+awx/requirements/requirements.txt
+awx/requirements/requirements_dev.txt
+django-ansible-base/requirements/requirements_dev.txt
+django-ansible-base/requirements/requirements_all.txt 

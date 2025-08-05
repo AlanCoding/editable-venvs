@@ -1,0 +1,18 @@
+# These are packages excluded when installing things from requirement_files.txt listings
+# those are pip install -r <file> installs
+# we can not install legit dependencies from a project editable install without abandoning dep resolution completely
+pip
+setuptools
+wheel
+# pbr is not actually needed at all, a mistake that it is listed in the first place
+pbr
+pkgconfig
+# DAB lists the oauth lib as a direct dependency
+# this avoids installing from AWX requirements
+django-oauth-toolkit
+# this is a dev requirement (we do not need) that imports cgi
+# this will trigger a warning that fails AWX tests
+coreapi
+# the version pinned in several places of xmlsec will not install
+# so this is listed in the pre_requirements.txt manually
+xmlsec 
