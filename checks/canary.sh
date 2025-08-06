@@ -11,7 +11,7 @@ echo "Using AWX repo: $REPO_ROOT/$AWX_REPO_NAME"
 run_awx() {
   echo
   echo "🔎 AWX"
-  (cd "$REPO_ROOT/$AWX_REPO_NAME" && AWX_LOGGING_MODE=stdout pytest awx/main/tests/functional/test_instances.py --create-db)
+  (cd "$REPO_ROOT/$AWX_REPO_NAME" && AWX_LOGGING_MODE=stdout PYTHONWARNINGS="ignore::DeprecationWarning:pkg_resources" pytest awx/main/tests/functional/test_instances.py --create-db)
 }
 
 run_dab() {
