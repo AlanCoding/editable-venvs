@@ -2,14 +2,16 @@
 set -euo pipefail
 
 REPO_ROOT="${REPO_ROOT:-$HOME/repos}"
+AWX_REPO_NAME="${AWX_REPO_NAME:-tower}"  # Default to tower, can override with awx
 CHECK_FILTER="${1:-}"  # Optional arg: awx, dab, eda, gateway
 
 echo "🐤 Running canary tests..."
+echo "Using AWX repo: $REPO_ROOT/$AWX_REPO_NAME"
 
 run_awx() {
   echo
   echo "🔎 AWX"
-  (cd "$REPO_ROOT/tower" && pytest awx/main/tests/functional/test_instances.py --create-db)
+  (cd "$REPO_ROOT/$AWX_REPO_NAME" && pytest awx/main/tests/functional/test_instances.py --create-db)
 }
 
 run_dab() {

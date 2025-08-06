@@ -95,6 +95,7 @@ jobs:
       run: |
         cd ${{ github.workspace }}/editable-venvs
         export REPO_ROOT=${{ github.workspace }}/repos
+        export AWX_REPO_NAME=awx
         source $HOME/venvs/test-ci/bin/activate
         ./checks/canary.sh awx
 
@@ -102,6 +103,7 @@ jobs:
       run: |
         cd ${{ github.workspace }}/editable-venvs
         export REPO_ROOT=${{ github.workspace }}/repos
+        export AWX_REPO_NAME=awx
         source $HOME/venvs/test-ci/bin/activate
         ./checks/canary.sh dab
 
@@ -109,5 +111,6 @@ jobs:
       run: |
         cd ${{ github.workspace }}/editable-venvs
         export REPO_ROOT=${{ github.workspace }}/repos
+        export AWX_REPO_NAME=awx
         source $HOME/venvs/test-ci/bin/activate
         ./checks/canary.sh eda 
