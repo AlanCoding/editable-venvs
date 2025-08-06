@@ -113,4 +113,23 @@ jobs:
         export REPO_ROOT=${{ github.workspace }}/repos
         export AWX_REPO_NAME=awx
         source $HOME/venvs/test-ci/bin/activate
-        ./checks/canary.sh eda 
+        ./checks/canary.sh eda
+
+    - name: Debug sanitized files on failure
+      if: failure()
+      run: |
+        cd ${{ github.workspace }}/editable-venvs
+        echo "🔍 DEBUG: Contents of sanitized/ folder:"
+        if [ -d "sanitized" ]; then
+          for file in sanitized/*; do
+            if [ -f "$file" ]; then
+              echo "📄 File: $file"
+              echo "----------------------------------------"
+              cat "$file"
+              echo "----------------------------------------"
+              echo
+            fi
+          done
+        else
+          echo "❌ sanitized/ directory not found"
+        fi
