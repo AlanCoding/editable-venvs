@@ -102,10 +102,18 @@ if [[ -f "$POETRY_PROJECTS_FILE" ]] && [[ $(grep -v '^#' "$POETRY_PROJECTS_FILE"
     echo "Creating build venv for poetry exports at: $BUILD_VENV_DIR"
     $PYTHON -m venv "$BUILD_VENV_DIR" --clear
     source "$BUILD_VENV_DIR/bin/activate"
+    echo "  Installing pip in build venv..."
     python -m ensurepip --upgrade
+    echo "  Installing poetry in build venv..."
     pip install --quiet poetry
-    poetry self remove poetry-plugin-export
+    echo "  Configuring poetry plugin..."
+    # Try to remove plugin first (ignore errors if not installed)
+    echo "    Attempting to remove existing poetry-plugin-export..."
+    poetry self remove poetry-plugin-export 2>/dev/null || echo "    (plugin not previously installed, continuing)"
+    # Add the plugin (this should always work)
+    echo "    Installing poetry-plugin-export..."
     poetry self add poetry-plugin-export
+    echo "  Poetry setup complete"
     deactivate
   fi
 else
@@ -130,8 +138,10 @@ if [[ -f "$POETRY_PROJECTS_FILE" ]]; then
     fi
 
     sanitized_poetry_req="$SANITIZED_DIR/$(basename "$poetry_project").txt"
-    echo "Exporting poetry project $poetry_project to: $sanitized_poetry_req"
+    echo "  Exporting poetry project $poetry_project to: $sanitized_poetry_req"
+    echo "    Running: poetry export --without-hashes -f requirements.txt -C $poetry_project_path"
     "$BUILD_VENV_DIR/bin/poetry" export --without-hashes -f requirements.txt -o "$(pwd)/$sanitized_poetry_req" -C "$poetry_project_path"
+    echo "    Export completed successfully"
   done < "$POETRY_PROJECTS_FILE"
 fi
 
