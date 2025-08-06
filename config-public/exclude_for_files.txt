@@ -15,4 +15,4 @@ django-oauth-toolkit
 coreapi
 # the version pinned in several places of xmlsec will not install
 # so this is listed in the pre_requirements.txt manually
-xmlsec 
+xmlsec

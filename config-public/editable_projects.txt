@@ -3,4 +3,4 @@ eda-server
 awx_plugins.interfaces
 awx-plugins:credentials-github-app
 ansible-runner
-dispatcherd 
+dispatcherd

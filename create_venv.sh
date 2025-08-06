@@ -166,15 +166,17 @@ echo
 echo "Phase 3: Installing requirement files (sanitized)"
 
 # First, sanitize traditional requirements files
+echo "Processing requirements files from: $EXTRA_REQUIREMENTS_FILE"
 while IFS= read -r extra_file; do
   [[ -z "$extra_file" || "$extra_file" =~ ^# ]] && continue
+  echo "  Processing entry: $extra_file"
   full_req_path="$REPO_ROOT/$extra_file"
   if [[ ! -f "$full_req_path" ]]; then
-    echo "Skipping missing requirements file: $full_req_path"
+    echo "    Skipping missing requirements file: $full_req_path"
     continue
   fi
   sanitized_req="$SANITIZED_DIR/$(echo "$extra_file" | tr '/' '__')"
-  echo "Sanitizing requirements file: $full_req_path -> $sanitized_req"
+  echo "    Sanitizing requirements file: $full_req_path -> $sanitized_req"
   grep -vFf "$EXCLUDE_FILE" "$full_req_path" > "$sanitized_req"
 done < "$EXTRA_REQUIREMENTS_FILE"
 
