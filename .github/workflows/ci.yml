@@ -10,6 +10,13 @@ on:
 jobs:
   test:
     runs-on: ubuntu-latest
+    env:
+      REPO_ROOT: ${{ github.workspace }}/repos
+      AWX_REPO_NAME: awx
+      # Use alternative ports to avoid conflicts with system services in CI
+      EDA_PG_PORT: 15432
+      EDA_REDIS_PORT: 16379
+      GATEWAY_REDIS_PORT: 16380
     strategy:
       matrix:
         python-version: ['3.11', '3.12']
@@ -87,31 +94,24 @@ jobs:
     - name: Create test virtual environment
       run: |
         cd ${{ github.workspace }}/editable-venvs
-        export REPO_ROOT=${{ github.workspace }}/repos
         export CONFIG_DIR=config-public
         ./create_venv.sh test-ci
 
     - name: Run AWX canary test
       run: |
         cd ${{ github.workspace }}/editable-venvs
-        export REPO_ROOT=${{ github.workspace }}/repos
-        export AWX_REPO_NAME=awx
         source $HOME/venvs/test-ci/bin/activate
         ./checks/canary.sh awx
 
     - name: Run django-ansible-base canary test
       run: |
         cd ${{ github.workspace }}/editable-venvs
-        export REPO_ROOT=${{ github.workspace }}/repos
-        export AWX_REPO_NAME=awx
         source $HOME/venvs/test-ci/bin/activate
         ./checks/canary.sh dab
 
     - name: Run EDA canary test
       run: |
         cd ${{ github.workspace }}/editable-venvs
-        export REPO_ROOT=${{ github.workspace }}/repos
-        export AWX_REPO_NAME=awx
         source $HOME/venvs/test-ci/bin/activate
         ./checks/canary.sh eda
 
