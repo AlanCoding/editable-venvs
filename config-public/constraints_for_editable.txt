@@ -1,0 +1,6 @@
+# atf is required by other projects
+# but those projects specify a version, we need atf as an editable install
+# so we superficially create this constraint to un-constrain what other project set
+atf>=0
+# xmlsec is handled manually
+xmlsec>1.3.13

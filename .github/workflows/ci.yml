@@ -1,0 +1,135 @@
+name: CI
+
+on:
+  push:
+    branches: [ devel ]
+  pull_request:
+    branches: [ devel ]
+  workflow_dispatch:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    env:
+      REPO_ROOT: ${{ github.workspace }}/repos
+      AWX_REPO_NAME: awx
+      # Use alternative ports to avoid conflicts with system services in CI
+      EDA_PG_PORT: 15432
+      EDA_REDIS_PORT: 16379
+      GATEWAY_REDIS_PORT: 16380
+    strategy:
+      matrix:
+        python-version: ['3.11', '3.12']
+        
+    steps:
+    - name: Checkout editable-venvs
+      uses: actions/checkout@v4
+      with:
+        path: editable-venvs
+
+    - name: Set up Python ${{ matrix.python-version }}
+      uses: actions/setup-python@v4
+      with:
+        python-version: ${{ matrix.python-version }}
+
+    - name: Set up repositories directory
+      run: |
+        mkdir -p $HOME/repos
+        cd $HOME/repos
+
+    - name: Checkout AWX
+      uses: actions/checkout@v4
+      with:
+        repository: ansible/awx
+        path: ${{ github.workspace }}/repos/awx
+
+    - name: Checkout EDA Server
+      uses: actions/checkout@v4
+      with:
+        repository: ansible/eda-server
+        path: ${{ github.workspace }}/repos/eda-server
+
+    - name: Checkout django-ansible-base
+      uses: actions/checkout@v4
+      with:
+        repository: ansible/django-ansible-base
+        path: ${{ github.workspace }}/repos/django-ansible-base
+
+    - name: Checkout AWX Plugins Interfaces
+      uses: actions/checkout@v4
+      with:
+        repository: ansible/awx_plugins.interfaces
+        path: ${{ github.workspace }}/repos/awx_plugins.interfaces
+
+    - name: Checkout AWX Plugins
+      uses: actions/checkout@v4
+      with:
+        repository: ansible/awx-plugins
+        path: ${{ github.workspace }}/repos/awx-plugins
+
+    - name: Checkout Ansible Runner
+      uses: actions/checkout@v4
+      with:
+        repository: ansible/ansible-runner
+        path: ${{ github.workspace }}/repos/ansible-runner
+
+    - name: Checkout Dispatcherd
+      uses: actions/checkout@v4
+      with:
+        repository: ansible/dispatcherd
+        path: ${{ github.workspace }}/repos/dispatcherd
+
+    - name: Install system dependencies
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y \
+          postgresql postgresql-contrib redis-server docker-compose \
+          libxml2-dev libxmlsec1-dev libxmlsec1-openssl \
+          libldap2-dev libsasl2-dev libssl-dev \
+          python3-dev build-essential pkg-config \
+          libtool-bin
+        sudo systemctl start postgresql
+        sudo systemctl start redis-server
+
+    - name: Create test virtual environment
+      run: |
+        cd ${{ github.workspace }}/editable-venvs
+        export CONFIG_DIR=config-public
+        ./create_venv.sh test-ci
+
+    - name: Run AWX canary test
+      run: |
+        cd ${{ github.workspace }}/editable-venvs
+        source $HOME/venvs/test-ci/bin/activate
+        ./checks/canary.sh awx
+
+    - name: Run django-ansible-base canary test
+      run: |
+        cd ${{ github.workspace }}/editable-venvs
+        source $HOME/venvs/test-ci/bin/activate
+        ./checks/canary.sh dab
+
+    - name: Run EDA canary test
+      run: |
+        cd ${{ github.workspace }}/editable-venvs
+        source $HOME/venvs/test-ci/bin/activate
+        ./checks/canary.sh eda
+
+    - name: Debug sanitized files on failure
+      if: failure()
+      run: |
+        cd ${{ github.workspace }}/editable-venvs
+        echo "🔍 DEBUG: Contents of sanitized/ folder:"
+        if [ -d "sanitized" ]; then
+          for file in sanitized/*; do
+            if [ -f "$file" ]; then
+              echo "📄 File: $file"
+              echo "----------------------------------------"
+              cat "$file"
+              echo "----------------------------------------"
+              echo
+            fi
+          done
+        else
+          echo "❌ sanitized/ directory not found"
+        fi
