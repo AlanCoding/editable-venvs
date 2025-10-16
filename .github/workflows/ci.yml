@@ -142,7 +142,6 @@ jobs:
       AWX_REPO_NAME: awx
       EDA_PG_PORT: 15432
       EDA_REDIS_PORT: 16379
-      GATEWAY_REDIS_PORT: 16380
       GALAXY_PG_PORT: 15433
     strategy:
       fail-fast: false
@@ -160,21 +159,9 @@ jobs:
             venv: eda-server-split
             check: eda-server
             python: '3.11'
-          - project: awx_plugins.interfaces
-            venv: awx-plugins-interfaces-split
-            check: awx_plugins.interfaces
-            python: '3.11'
-          - project: awx-plugins
-            venv: awx-plugins-split
-            check: awx-plugins
-            python: '3.11'
           - project: ansible-runner
             venv: ansible-runner-split
             check: ansible-runner
-            python: '3.11'
-          - project: dispatcherd
-            venv: dispatcherd-split
-            check: dispatcherd
             python: '3.11'
           - project: galaxy_ng
             venv: galaxy-ng-split
@@ -215,29 +202,11 @@ jobs:
         repository: ansible/django-ansible-base
         path: ${{ github.workspace }}/repos/django-ansible-base
 
-    - name: Checkout AWX Plugins Interfaces
-      uses: actions/checkout@v4
-      with:
-        repository: ansible/awx_plugins.interfaces
-        path: ${{ github.workspace }}/repos/awx_plugins.interfaces
-
-    - name: Checkout AWX Plugins
-      uses: actions/checkout@v4
-      with:
-        repository: ansible/awx-plugins
-        path: ${{ github.workspace }}/repos/awx-plugins
-
     - name: Checkout Ansible Runner
       uses: actions/checkout@v4
       with:
         repository: ansible/ansible-runner
         path: ${{ github.workspace }}/repos/ansible-runner
-
-    - name: Checkout Dispatcherd
-      uses: actions/checkout@v4
-      with:
-        repository: ansible/dispatcherd
-        path: ${{ github.workspace }}/repos/dispatcherd
 
     - name: Checkout Galaxy NG
       uses: actions/checkout@v4

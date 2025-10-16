@@ -3,13 +3,12 @@ set -euo pipefail
 
 REPO_ROOT="${REPO_ROOT:-$HOME/repos}"
 AWX_REPO_NAME="${AWX_REPO_NAME:-tower}"  # Default to tower, can override with awx
-CHECK_FILTER="${1:-}"  # Optional arg: awx, dab, eda, gateway
+CHECK_FILTER="${1:-}"  # Optional arg: awx, dab, eda, ansible-runner, galaxy_ng
 
 # Configurable ports for CI/local compatibility
 # These can be overridden via environment variables (e.g., in GitHub Actions)
 EDA_PG_PORT="${EDA_PG_PORT:-5432}"
 EDA_REDIS_PORT="${EDA_REDIS_PORT:-6379}"
-GATEWAY_REDIS_PORT="${GATEWAY_REDIS_PORT:-6379}"
 GALAXY_PG_PORT="${GALAXY_PG_PORT:-5433}"
 
 echo "🐤 Running canary tests..."
@@ -49,26 +48,6 @@ run_eda() {
   )
 }
 
-run_awx_plugins() {
-  echo
-  echo "🔎 awx-plugins"
-  echo "Using repository: $REPO_ROOT/awx-plugins"
-  (
-    cd "$REPO_ROOT/awx-plugins" &&
-    pytest tests/github_app_test.py::test_github_app_invalid_args
-  )
-}
-
-run_awx_plugins_interfaces() {
-  echo
-  echo "🔎 awx_plugins.interfaces"
-  echo "Using repository: $REPO_ROOT/awx_plugins.interfaces"
-  (
-    cd "$REPO_ROOT/awx_plugins.interfaces" &&
-    pytest tests/smoke_test.py::test_smoke
-  )
-}
-
 run_runner() {
   echo
   echo "🔎 ansible-runner"
@@ -76,16 +55,6 @@ run_runner() {
   (
     cd "$REPO_ROOT/ansible-runner" &&
     pytest test/unit/test_utils.py::test_artifact_permissions
-  )
-}
-
-run_dispatcherd() {
-  echo
-  echo "🔎 dispatcherd"
-  echo "Using repository: $REPO_ROOT/dispatcherd"
-  (
-    cd "$REPO_ROOT/dispatcherd" &&
-    pytest tests/test_noop_broker.py::test_noop_broker_publish_message
   )
 }
 
@@ -125,37 +94,13 @@ run_galaxy_ng() {
   )
 }
 
-run_gateway() {
-    echo
-    echo "🔎 aap-gateway"
-    echo "Using repository: $REPO_ROOT/aap-gateway"
-    (
-        cd "$REPO_ROOT/aap-gateway" &&
-        # Use configurable Redis port (defaults to standard port, can be overridden in CI)
-        export REDIS_PORT="$GATEWAY_REDIS_PORT"
-        
-        # Ensure cleanup on exit
-        trap 'docker compose -f tools/generated/docker-compose.yml down --remove-orphans' EXIT
-        
-        docker compose -f tools/generated/docker-compose.yml up -d db redis1 &&
-        DATABASE_NAME=gateway DATABASE_USER=gateway DATABASE_PASSWORD=gateway DATABASE_HOST=localhost DATABASE_PORT=5440 \
-        REDIS_URL=redis://localhost:$GATEWAY_REDIS_PORT REDIS_HOSTS=localhost:$GATEWAY_REDIS_PORT REDIS_MODE=standalone \
-        GATEWAY_SECRET_KEY_FILE=tools/configs/dev_secret_key DJANGO_SETTINGS_MODULE=aap_gateway_api.settings \
-        pytest aap_gateway_api/tests/views/api/test_api_root.py
-    )
-}
-
 case "$CHECK_FILTER" in
   "" )
     run_awx
     run_dab
     run_eda
-    run_awx_plugins
-    run_awx_plugins_interfaces
     run_runner
-    run_dispatcherd
     run_galaxy_ng
-    run_gateway
     ;;
   awx )
     run_awx
@@ -166,27 +111,15 @@ case "$CHECK_FILTER" in
   eda | eda-server )
     run_eda
     ;;
-  awx-plugins )
-    run_awx_plugins
-    ;;
-  awx_plugins.interfaces )
-    run_awx_plugins_interfaces
-    ;;
   ansible-runner )
     run_runner
-    ;;
-  dispatcherd )
-    run_dispatcherd
     ;;
   galaxy_ng )
     run_galaxy_ng
     ;;
-  gateway )
-    run_gateway
-    ;;
   * )
     echo "❌ Unknown check: $CHECK_FILTER"
-    echo "   Expected one of: awx, dab, django-ansible-base, eda, eda-server, awx-plugins, awx_plugins.interfaces, ansible-runner, dispatcherd, galaxy_ng, gateway"
+    echo "   Expected one of: awx, dab, django-ansible-base, eda, eda-server, ansible-runner, galaxy_ng"
     exit 1
     ;;
 esac

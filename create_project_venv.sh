@@ -34,7 +34,7 @@ for base_file in constraints_for_editable.txt exclude_for_files.txt pre_requirem
   fi
 done
 
-python <<'PY' "$PROJECT_SETTINGS_FILE" "$PROJECT_KEY" "$TEMP_CONFIG_DIR"
+python - "$PROJECT_SETTINGS_FILE" "$PROJECT_KEY" "$TEMP_CONFIG_DIR" <<'PY'
 import json
 import sys
 from pathlib import Path
