@@ -53,7 +53,21 @@ install_type = info.get("install_type", "editable")
 repo = info.get("repo", project_key)
 extras = info.get("extras", [])
 requirements = info.get("requirements", [])
-poetry = bool(info.get("poetry", False))
+
+poetry_field = info.get("poetry", False)
+poetry_enabled = bool(poetry_field)
+
+poetry_groups = info.get("poetry_groups", [])
+if isinstance(poetry_groups, str):
+    poetry_groups = [poetry_groups]
+elif poetry_groups is None:
+    poetry_groups = []
+else:
+    poetry_groups = list(poetry_groups)
+
+poetry_groups = [str(group) for group in poetry_groups if str(group).strip()]
+poetry_entry_groups = ",".join(poetry_groups)
+
 post_requirements = info.get("post_requirements", [])
 
 editable_lines = []
@@ -72,11 +86,18 @@ elif install_type == "editable_no_deps":
 else:
     raise SystemExit(f"❌ Unsupported install_type '{install_type}' for project '{project_key}'")
 
+poetry_lines = []
+if poetry_enabled or poetry_entry_groups:
+    poetry_line = repo
+    if poetry_entry_groups:
+        poetry_line = f"{repo}:{poetry_entry_groups}"
+    poetry_lines.append(poetry_line)
+
 files_to_write = {
     "editable_projects.txt": editable_lines,
     "editable_projects_no_deps.txt": no_deps_lines,
     "requirement_files.txt": requirements,
-    "poetry_projects.txt": [repo] if poetry else [],
+    "poetry_projects.txt": poetry_lines,
     "post_requirements.txt": post_requirements,
 }
 

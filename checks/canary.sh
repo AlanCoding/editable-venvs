@@ -3,13 +3,28 @@ set -euo pipefail
 
 REPO_ROOT="${REPO_ROOT:-$HOME/repos}"
 AWX_REPO_NAME="${AWX_REPO_NAME:-tower}"  # Default to tower, can override with awx
-CHECK_FILTER="${1:-}"  # Optional arg: awx, dab, eda, ansible-runner, galaxy_ng
+CHECK_FILTER="${1:-}"  # Optional arg: awx, dab, eda, galaxy_ng
 
 # Configurable ports for CI/local compatibility
 # These can be overridden via environment variables (e.g., in GitHub Actions)
 EDA_PG_PORT="${EDA_PG_PORT:-5432}"
 EDA_REDIS_PORT="${EDA_REDIS_PORT:-6379}"
 GALAXY_PG_PORT="${GALAXY_PG_PORT:-5433}"
+
+compose() {
+  if command -v docker >/dev/null 2>&1 && docker compose version >/dev/null 2>&1; then
+    docker compose "$@"
+    return
+  fi
+
+  if command -v docker-compose >/dev/null 2>&1; then
+    docker-compose "$@"
+    return
+  fi
+
+  echo "❌ docker compose/docker-compose is required but not installed" >&2
+  return 1
+}
 
 echo "🐤 Running canary tests..."
 
@@ -38,23 +53,13 @@ run_eda() {
     export EDA_REDIS_PORT="$EDA_REDIS_PORT"
     
     # Ensure cleanup on exit
-    trap 'docker-compose -p eda -f tools/docker/docker-compose-dev.yaml down --remove-orphans' EXIT
-    
-    docker-compose -p eda -f tools/docker/docker-compose-dev.yaml up --detach postgres redis &&
+    trap 'compose -p eda -f tools/docker/docker-compose-dev.yaml down --remove-orphans' EXIT
+
+    compose -p eda -f tools/docker/docker-compose-dev.yaml up --detach postgres redis &&
     # Update database connection to use the configured ports
     EDA_DB_HOST=localhost EDA_DB_PORT="$EDA_PG_PORT" EDA_MQ_HOST=localhost EDA_MQ_PORT="$EDA_REDIS_PORT" \
-    DJANGO_SETTINGS_MODULE=aap_eda.settings.default EDA_SECRET_KEY=insecure EDA_DB_PASSWORD=secret \
+      DJANGO_SETTINGS_MODULE=aap_eda.settings.default EDA_SECRET_KEY=insecure EDA_DB_PASSWORD=secret \
       pytest tests/integration/api/test_eda_credential.py
-  )
-}
-
-run_runner() {
-  echo
-  echo "🔎 ansible-runner"
-  echo "Using repository: $REPO_ROOT/ansible-runner"
-  (
-    cd "$REPO_ROOT/ansible-runner" &&
-    pytest test/unit/test_utils.py::test_artifact_permissions
   )
 }
 
@@ -80,9 +85,9 @@ run_galaxy_ng() {
     export PULP_FILE_UPLOAD_TEMP_DIR="/tmp/pulp/artifact-tmp"
 
     compose_file="dev/compose/aap.yaml"
-    trap 'docker compose -f "$compose_file" down --remove-orphans' EXIT
-    docker compose -f "$compose_file" up --force-recreate -d postgres
-    docker compose -f "$compose_file" exec postgres bash -c "while ! pg_isready -U galaxy_ng; do sleep 1; done"
+    trap 'compose -f "$compose_file" down --remove-orphans' EXIT
+    compose -f "$compose_file" up --force-recreate -d postgres
+    compose -f "$compose_file" exec -T postgres bash -c "while ! pg_isready -U galaxy_ng; do sleep 1; done"
 
     rm -rf /tmp/pulp
     mkdir -p /tmp/pulp/tmp /tmp/pulp/artifact-tmp /tmp/pulp/media /tmp/pulp/assets
@@ -99,7 +104,6 @@ case "$CHECK_FILTER" in
     run_awx
     run_dab
     run_eda
-    run_runner
     run_galaxy_ng
     ;;
   awx )
@@ -111,15 +115,12 @@ case "$CHECK_FILTER" in
   eda | eda-server )
     run_eda
     ;;
-  ansible-runner )
-    run_runner
-    ;;
   galaxy_ng )
     run_galaxy_ng
     ;;
   * )
     echo "❌ Unknown check: $CHECK_FILTER"
-    echo "   Expected one of: awx, dab, django-ansible-base, eda, eda-server, ansible-runner, galaxy_ng"
+    echo "   Expected one of: awx, dab, django-ansible-base, eda, eda-server, galaxy_ng"
     exit 1
     ;;
 esac

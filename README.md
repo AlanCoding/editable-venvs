@@ -151,11 +151,12 @@ editable-venvs/
 
 ### Other Configuration Files
 
-- **`config/poetry_projects.txt`**: Projects using Poetry whose dependencies should be exported via `poetry export`
+- **`config/poetry_projects.txt`**: Projects using Poetry whose dependencies should be exported via `poetry export`. Entries may
+  optionally append `:<group1,group2>` to request extra Poetry dependency groups during export.
 - **`config/requirement_files.txt`**: Additional requirements files to install before projects
 - **`config/exclude_for_files.txt`**: Packages to exclude during requirements installation
 - **`config/constraints_for_editable.txt`**: Version constraints to apply during installation
-- **`config/project_settings.json`**: Describes how each individual project should be installed when using `create_project_venv.sh`, including extras, requirement files, and optional Poetry export flags. Public automation uses `config-public/project_settings.json`, which includes the `galaxy_ng` split environment while keeping it out of the unified environment.
+- **`config/project_settings.json`**: Describes how each individual project should be installed when using `create_project_venv.sh`, including extras, requirement files, and optional Poetry export flags. You can set `"poetry": true` to enable exports and `"poetry_groups"` to request additional Poetry groups (for example, `"test"` so pytest is available for `eda-server`). Public automation uses `config-public/project_settings.json`, which includes the `galaxy_ng` split environment while keeping it out of the unified environment.
 
 ## Environment Variables
 
@@ -172,7 +173,8 @@ The tool automatically handles projects that use Poetry for dependency managemen
 2. **Automatic Export**: Uses `poetry export` to generate requirements.txt files
 3. **Seamless Integration**: Poetry-exported dependencies are installed alongside other requirements
 
-Poetry projects are listed in `config/poetry_projects.txt` (one per line) and must contain a `pyproject.toml` file.
+Poetry projects are listed in `config/poetry_projects.txt` (one per line) and must contain a `pyproject.toml` file. Lines may specify
+additional dependency groups using the format `repo:group1,group2`.
 
 ## Verification Tools
 

@@ -5,7 +5,8 @@
     "extras": [],
     "requirements": [
       "awx/requirements/requirements.txt",
-      "awx/requirements/requirements_dev.txt"
+      "awx/requirements/requirements_dev.txt",
+      "awx/requirements/requirements_git.txt"
     ]
   },
   "django-ansible-base": {
@@ -31,7 +32,10 @@
     "install_type": "editable",
     "extras": [],
     "requirements": [],
-    "poetry": true
+    "poetry": true,
+    "poetry_groups": [
+      "test"
+    ]
   },
   "awx_plugins.interfaces": {
     "repo": "awx_plugins.interfaces",
@@ -51,15 +55,6 @@
     "requirements": [],
     "post_requirements": [
       "awx-plugins/dependencies/direct/py.in"
-    ]
-  },
-  "ansible-runner": {
-    "repo": "ansible-runner",
-    "install_type": "editable",
-    "extras": [],
-    "requirements": [],
-    "post_requirements": [
-      "ansible-runner/test/requirements.txt"
     ]
   },
   "dispatcherd": {

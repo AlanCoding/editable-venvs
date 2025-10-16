@@ -159,10 +159,6 @@ jobs:
             venv: eda-server-split
             check: eda-server
             python: '3.11'
-          - project: ansible-runner
-            venv: ansible-runner-split
-            check: ansible-runner
-            python: '3.11'
           - project: galaxy_ng
             venv: galaxy-ng-split
             check: galaxy_ng
@@ -201,12 +197,6 @@ jobs:
       with:
         repository: ansible/django-ansible-base
         path: ${{ github.workspace }}/repos/django-ansible-base
-
-    - name: Checkout Ansible Runner
-      uses: actions/checkout@v4
-      with:
-        repository: ansible/ansible-runner
-        path: ${{ github.workspace }}/repos/ansible-runner
 
     - name: Checkout Galaxy NG
       uses: actions/checkout@v4
