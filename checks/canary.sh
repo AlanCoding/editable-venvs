@@ -108,7 +108,7 @@ run_galaxy_ng() {
       --env POSTGRESQL_DATABASE=galaxy_ng \
       "$image" >/dev/null
 
-    docker exec -T "$container_name" bash -c 'until pg_isready -U galaxy_ng -h 127.0.0.1 -p 5432; do sleep 1; done'
+    docker exec "$container_name" bash -c 'until pg_isready -U galaxy_ng -h 127.0.0.1 -p 5432; do sleep 1; done'
 
     rm -rf /tmp/pulp
     mkdir -p /tmp/pulp/tmp /tmp/pulp/artifact-tmp /tmp/pulp/media /tmp/pulp/assets
