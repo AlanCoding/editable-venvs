@@ -84,10 +84,31 @@ run_galaxy_ng() {
     export PULP_MEDIA_ROOT="/tmp/pulp/media"
     export PULP_FILE_UPLOAD_TEMP_DIR="/tmp/pulp/artifact-tmp"
 
-    compose_file="dev/compose/aap.yaml"
-    trap 'compose -f "$compose_file" down --remove-orphans' EXIT
-    compose -f "$compose_file" up --force-recreate -d postgres
-    compose -f "$compose_file" exec -T postgres bash -c "while ! pg_isready -U galaxy_ng; do sleep 1; done"
+    if ! command -v docker >/dev/null 2>&1; then
+      echo "❌ docker is required to run the galaxy_ng check" >&2
+      exit 1
+    fi
+
+    container_name="galaxy-ng-postgres"
+    image="quay.io/sclorg/postgresql-15-c9s:latest"
+
+    cleanup() {
+      docker rm -f "$container_name" >/dev/null 2>&1 || true
+    }
+
+    cleanup
+    trap cleanup EXIT
+
+    docker run \
+      --detach \
+      --name "$container_name" \
+      --publish "$GALAXY_PG_PORT:5432" \
+      --env POSTGRESQL_USER=galaxy_ng \
+      --env POSTGRESQL_PASSWORD=galaxy_ng \
+      --env POSTGRESQL_DATABASE=galaxy_ng \
+      "$image" >/dev/null
+
+    docker exec -T "$container_name" bash -c 'until pg_isready -U galaxy_ng -h 127.0.0.1 -p 5432; do sleep 1; done'
 
     rm -rf /tmp/pulp
     mkdir -p /tmp/pulp/tmp /tmp/pulp/artifact-tmp /tmp/pulp/media /tmp/pulp/assets
