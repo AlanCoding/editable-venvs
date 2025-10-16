@@ -76,6 +76,8 @@ Creates a clean, isolated virtual environment at `~/venvs/<venv-name>` containin
 
 ## Usage
 
+### Unified environment
+
 ```bash
 # Create environment for AWX development
 PYTHON=python3.11 ./create_venv.sh awx
@@ -99,11 +101,26 @@ After completion, activate the environment:
 source ~/venvs/awx/bin/activate
 ```
 
+### Project-specific environments
+
+Use `create_project_venv.sh` to build an isolated virtual environment for a single repository. The script reads project metadata from `config/project_settings.json` (or another `CONFIG_DIR`) and reuses the existing installer while limiting the scope to the requested project.
+
+```bash
+# Create a venv only for awx
+PYTHON=python3.11 ./create_project_venv.sh awx-dev awx
+
+# Create a venv for galaxy_ng using the new split configuration
+CONFIG_DIR=config-public ./create_project_venv.sh galaxy-demo galaxy_ng
+```
+
+Project entries include optional extra requirement files that install after the base environment has been created, which is useful for test-only dependencies.
+
 ## Project Structure
 
 ```
 editable-venvs/
 ├── create_venv.sh                    # Main script
+├── create_project_venv.sh            # Project-scoped environment helper
 ├── config/                           # Configuration files
 │   ├── editable_projects.txt         # Projects to install with dependencies
 │   ├── editable_projects_no_deps.txt # Projects to install with --no-deps
@@ -111,7 +128,8 @@ editable-venvs/
 │   ├── pre_requirements.txt          # Requirements to install directly (no exclusions)
 │   ├── requirement_files.txt         # Additional requirements files to install
 │   ├── exclude_for_files.txt         # Packages to exclude during installation
-│   └── constraints_for_editable.txt  # Version constraints for editable installs
+│   ├── constraints_for_editable.txt  # Version constraints for editable installs
+│   └── project_settings.json         # Metadata for per-project environments
 ├── checks/                           # Verification tools
 ├── sanitized/                        # Generated filtered requirements files
 ├── notes/                            # Documentation and migration notes
@@ -137,6 +155,7 @@ editable-venvs/
 - **`config/requirement_files.txt`**: Additional requirements files to install before projects
 - **`config/exclude_for_files.txt`**: Packages to exclude during requirements installation
 - **`config/constraints_for_editable.txt`**: Version constraints to apply during installation
+- **`config/project_settings.json`**: Describes how each individual project should be installed when using `create_project_venv.sh`, including extras, requirement files, and optional Poetry export flags. Public automation uses `config-public/project_settings.json`, which includes the `galaxy_ng` split environment while keeping it out of the unified environment.
 
 ## Environment Variables
 
