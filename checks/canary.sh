@@ -89,26 +89,17 @@ run_galaxy_ng() {
       exit 1
     fi
 
-    container_name="galaxy-ng-postgres"
-    image="quay.io/sclorg/postgresql-15-c9s:latest"
+    compose_args=(-p galaxy_ng -f dev/compose/aap.yaml)
 
     cleanup() {
-      docker rm -f "$container_name" >/dev/null 2>&1 || true
+      compose "${compose_args[@]}" down --remove-orphans --volumes >/dev/null 2>&1 || true
     }
 
     cleanup
     trap cleanup EXIT
 
-    docker run \
-      --detach \
-      --name "$container_name" \
-      --publish "$GALAXY_PG_PORT:5432" \
-      --env POSTGRESQL_USER=galaxy_ng \
-      --env POSTGRESQL_PASSWORD=galaxy_ng \
-      --env POSTGRESQL_DATABASE=galaxy_ng \
-      "$image" >/dev/null
-
-    docker exec "$container_name" bash -c 'until pg_isready -U galaxy_ng -h 127.0.0.1 -p 5432; do sleep 1; done'
+    compose "${compose_args[@]}" up --force-recreate -d postgres >/dev/null
+    compose "${compose_args[@]}" exec postgres bash -c 'while ! pg_isready -U galaxy_ng; do sleep 1; done'
 
     rm -rf /tmp/pulp
     mkdir -p /tmp/pulp/tmp /tmp/pulp/artifact-tmp /tmp/pulp/media /tmp/pulp/assets
