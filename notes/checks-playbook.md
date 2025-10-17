@@ -1,6 +1,6 @@
 # Project Check Playbook
 
-This guide summarizes the minimum manual steps required to reproduce the canary checks run by this repository for each supported project. All commands assume repositories live under `$REPO_ROOT` (default: `$HOME/repos`) and virtual environments are created in `$HOME/venvs`.
+This guide summarizes the minimum manual steps required to reproduce the canary checks run by this repository for each supported project. Unless otherwise noted, run the commands from the root of the corresponding project repository.
 
 ## Common prerequisites
 
@@ -25,25 +25,32 @@ This guide summarizes the minimum manual steps required to reproduce the canary 
        libtool-bin
      ```
    Ensure the Docker daemon is running (e.g., `sudo systemctl start docker`) so compose commands can launch services.
-2. Create the repositories directory and clone the projects under `$REPO_ROOT` if they are not already present.
-3. When using Poetry-backed projects, keep the shared configuration files in `config/` or `config-public/` available so the helper scripts can resolve groups and post-install requirements.
+2. Clone the target repository locally if it is not already present.
+3. Create a fresh Python virtual environment (for example `python3 -m venv .venv`) before installing project-specific dependencies.
 
 ## AWX
 
 ### Prepare a project virtual environment
-1. Ensure the repository is cloned at `$REPO_ROOT/awx`.
-2. Create a split virtual environment with the public configuration:
+1. Create and activate a virtual environment:
    ```bash
-   CONFIG_DIR=config-public ./create_project_venv.sh awx-canary awx
+   python3 -m venv .venv
+   source .venv/bin/activate
+   python -m pip install --upgrade pip
    ```
-3. Activate the environment:
+2. Install the AWX dependency sets:
    ```bash
-   source ~/venvs/awx-canary/bin/activate
+   pip install \
+     -r requirements/requirements.txt \
+     -r requirements/requirements_dev.txt \
+     -r requirements/requirements_git.txt
+   ```
+3. Install AWX in editable mode so `pytest` can import the package:
+   ```bash
+   pip install -e .
    ```
 
 ### Run the smoke test
 ```bash
-cd "$REPO_ROOT/awx"
 AWX_LOGGING_MODE=stdout pytest \
   awx/main/tests/functional/test_instances.py \
   --create-db \
@@ -54,45 +61,50 @@ AWX_LOGGING_MODE=stdout pytest \
 ## django-ansible-base
 
 ### Prepare a project virtual environment
-1. Confirm the repository is available at `$REPO_ROOT/django-ansible-base`.
-2. Create the environment with Poetry extras defined in `config/project_settings.json`:
+1. Create and activate a virtual environment:
    ```bash
-   CONFIG_DIR=config-public ./create_project_venv.sh dab-canary django-ansible-base
+   python3 -m venv .venv
+   source .venv/bin/activate
+   python -m pip install --upgrade pip
    ```
-3. Activate the environment:
+2. Install the development requirements that mirror the CI environment:
    ```bash
-   source ~/venvs/dab-canary/bin/activate
+   pip install \
+     -r requirements/requirements_dev.txt \
+     -r requirements/requirements_all.txt
+   ```
+3. Install the package with the extras expected by the smoke test while avoiding a second dependency resolution pass:
+   ```bash
+   pip install -e .[authentication,rest-filters,jwt_consumer,resource-registry,rbac,feature-flags,api-documentation,oauth2-provider] --no-deps
    ```
 
 ### Run the smoke test
 ```bash
-cd "$REPO_ROOT/django-ansible-base"
 make postgres
 pytest test_app/tests/rbac/models/test_uniqueness.py
-```
-
-Stop the temporary PostgreSQL container with:
-```bash
-cd "$REPO_ROOT/django-ansible-base"
-make postgres-down
 ```
 
 ## eda-server
 
 ### Prepare a project virtual environment
-1. Verify the repository resides at `$REPO_ROOT/eda-server`.
-2. Build the environment (the configuration exports Poetry's `test` group so pytest is available):
+1. Create and activate a virtual environment:
    ```bash
-   CONFIG_DIR=config-public ./create_project_venv.sh eda-canary eda-server
+   python3 -m venv .venv
+   source .venv/bin/activate
+   python -m pip install --upgrade pip poetry
    ```
-3. Activate the environment:
+2. Export the Poetry-managed dependencies that power the integration test and install them into the active environment:
    ```bash
-   source ~/venvs/eda-canary/bin/activate
+   poetry export --without-hashes --with test -f requirements.txt -o /tmp/eda-test-requirements.txt
+   pip install -r /tmp/eda-test-requirements.txt
+   ```
+3. Install the repository itself in editable mode:
+   ```bash
+   pip install -e .
    ```
 
 ### Start supporting services
 ```bash
-cd "$REPO_ROOT/eda-server"
 EDA_PG_PORT=5432 EDA_REDIS_PORT=6379 \
   docker compose -p eda -f tools/docker/docker-compose-dev.yaml up --detach postgres redis
 ```
@@ -100,7 +112,6 @@ Wait for both services to report healthy status (the compose file configures hea
 
 ### Run the smoke test
 ```bash
-cd "$REPO_ROOT/eda-server"
 EDA_DB_HOST=localhost EDA_DB_PORT=5432 \
 EDA_MQ_HOST=localhost EDA_MQ_PORT=6379 \
 DJANGO_SETTINGS_MODULE=aap_eda.settings.default \
@@ -109,28 +120,31 @@ EDA_DB_PASSWORD=secret \
 pytest tests/integration/api/test_eda_credential.py
 ```
 
-### Tear down services
-```bash
-cd "$REPO_ROOT/eda-server"
-docker compose -p eda -f tools/docker/docker-compose-dev.yaml down --remove-orphans
-```
-
 ## galaxy_ng
 
 ### Prepare a project virtual environment
-1. Confirm `$REPO_ROOT/galaxy_ng` exists.
-2. Build the split environment (post requirements install `unittest_requirements.txt`):
+1. Create and activate a virtual environment:
    ```bash
-   CONFIG_DIR=config-public ./create_project_venv.sh galaxy-canary galaxy_ng
+   python3 -m venv .venv
+   source .venv/bin/activate
+   python -m pip install --upgrade pip
    ```
-3. Activate the environment:
+2. Install the unit-test dependency lockfile and the package under test:
    ```bash
-   source ~/venvs/galaxy-canary/bin/activate
+   pip install -r unittest_requirements.txt
+   pip install -e .
+   ```
+3. (Optional) If sibling repositories such as `django-ansible-base`, `pulpcore`, `pulp_ansible`, `galaxy-importer`, `dynaconf`, `django`, or `django-rest-framework` are checked out alongside `galaxy_ng`, install them in editable mode to mirror CI's behavior:
+   ```bash
+   for project in ../django-ansible-base ../pulpcore ../pulp_ansible ../galaxy-importer ../dynaconf ../django ../django-rest-framework; do
+     if [[ -d "$project" ]]; then
+       pip install -e "$project"
+     fi
+   done
    ```
 
 ### Start PostgreSQL via docker compose
 ```bash
-cd "$REPO_ROOT/galaxy_ng"
 docker compose -p galaxy_ng -f dev/compose/aap.yaml up --force-recreate -d postgres
 ```
 Wait for readiness:
@@ -150,7 +164,6 @@ fi
 
 ### Run the smoke test
 ```bash
-cd "$REPO_ROOT/galaxy_ng"
 DJANGO_SETTINGS_MODULE=pulpcore.app.settings \
 PULP_DATABASES__default__ENGINE=django.db.backends.postgresql \
 PULP_DATABASES__default__NAME=galaxy_ng \
@@ -167,25 +180,25 @@ PULP_FILE_UPLOAD_TEMP_DIR=/tmp/pulp/artifact-tmp \
 pytest galaxy_ng/tests/unit/test_models.py::TestSetting::test_get_settings_as_dict
 ```
 
-### Tear down services
-```bash
-docker compose -p galaxy_ng -f dev/compose/aap.yaml down --remove-orphans --volumes
-```
-
 ## aap-gateway (reference)
 
 While this private repository is not exercised by automated checks here, the shared tooling reveals how to bootstrap its environment:
 
-1. Include the repository in the unified environment by running:
+1. Create and activate a virtual environment:
    ```bash
-   CONFIG_DIR=config ./create_venv.sh gateway-dev
+   python3 -m venv .venv
+   source .venv/bin/activate
+   python -m pip install --upgrade pip
    ```
-   This configuration installs `aap-gateway` in editable mode without automatic dependency resolution and consumes `aap-gateway/requirements/requirements.txt` to provide its pinned dependencies.
-2. Activate the environment:
+2. Install the pinned requirements used across the fleet:
    ```bash
-   source ~/venvs/gateway-dev/bin/activate
+   pip install -r requirements/requirements.txt
    ```
-3. Follow the repository's internal README to run its validation suite (commonly a targeted `pytest` or tox environment). The unified environment already aligns protobuf-related pins with the rest of the stack, as documented in `config/pre_requirements.txt`.
+3. Install the gateway in editable mode without re-resolving dependencies:
+   ```bash
+   pip install -e . --no-deps
+   ```
+4. Execute the repository's targeted validation command (for example `pytest` or a tox environment) as documented in the project README.
 
 ## Cross-project template
 
@@ -195,11 +208,11 @@ Use this template to capture new project smoke tests in a consistent format.
    - Install platform packages and command-line tools required by the project (database clients, Docker, build headers). See [Common prerequisites](#common-prerequisites) for baseline packages.
    - Export any project-specific environment variables required before provisioning services.
 2. **Virtual environment creation**
-   - For unified installs: `CONFIG_DIR=<config> ./create_venv.sh <venv-name>`.
-   - For split installs: `CONFIG_DIR=<config> ./create_project_venv.sh <venv-name> <project-key>`.
-   - Activate with `source ~/venvs/<venv-name>/bin/activate`.
-3. **Optional dependency extras**
-   - Install post-requirement files or editable siblings with `pip install -e ../<dependency>` if the repository detects optional neighbors.
+   - Create an isolated environment with `python3 -m venv .venv` (or an equivalent tool) and activate it.
+   - Upgrade pip and install the repository's requirement files or Poetry exports that correspond to the desired test target.
+3. **Project installation**
+   - Install the repository itself in editable mode, optionally including extras, for example: `pip install -e .[extra-a,extra-b]`.
+   - Add neighboring editable checkouts when the project autodetects them (for instance sibling Django or pulpcore packages).
 4. **Service orchestration**
    - Start required infrastructure (databases, cache, message brokers) via Docker:
      ```bash
@@ -216,9 +229,5 @@ Use this template to capture new project smoke tests in a consistent format.
    - Generate encryption keys or secrets if they are not checked into the repository.
 6. **Execute the smoke test**
    - Run the minimal high-signal command (pytest module, Django check, etc.).
-   - Capture artifacts such as coverage or JUnit XML when useful for CI.
-7. **Cleanup**
-   - Stop auxiliary services with `docker compose ... down --remove-orphans` (add `--volumes` if the data should be discarded).
-   - Deactivate the virtual environment if desired.
 
 Populate each placeholder with concrete values from the target repository to produce a reproducible check recipe.
