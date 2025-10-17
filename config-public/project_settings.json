@@ -37,6 +37,14 @@
       "test"
     ]
   },
+  "aap-gateway": {
+    "repo": "aap-gateway",
+    "install_type": "editable_no_deps",
+    "extras": [],
+    "requirements": [
+      "aap-gateway/requirements/requirements.txt"
+    ]
+  },
   "awx_plugins.interfaces": {
     "repo": "awx_plugins.interfaces",
     "install_type": "editable",

@@ -128,6 +128,49 @@ EDA_DB_PASSWORD=secret \
 pytest tests/integration/api/test_eda_credential.py
 ```
 
+## aap-gateway
+
+### Prepare a project virtual environment
+1. Create and activate a virtual environment:
+   ```bash
+   python3 -m venv .venv
+   source .venv/bin/activate
+   python -m pip install --upgrade pip
+   ```
+2. Install the project's runtime dependencies:
+   ```bash
+   pip install -r requirements/requirements.txt
+   ```
+3. Install the repository itself in editable mode:
+   ```bash
+   pip install -e .
+   ```
+
+### Start supporting services
+```bash
+docker compose -p gateway -f tools/generated/docker-compose.yml up --detach db redis1
+```
+Wait for the database to accept connections:
+```bash
+docker compose -p gateway -f tools/generated/docker-compose.yml exec db \
+  bash -c 'while ! pg_isready -h localhost -p 5440 -U gateway; do sleep 1; done'
+```
+
+### Run the smoke test
+```bash
+DATABASE_NAME=gateway DATABASE_USER=gateway DATABASE_PASSWORD=gateway \
+DATABASE_HOST=localhost DATABASE_PORT=5440 \
+REDIS_URL=redis://localhost:6379 REDIS_HOSTS=localhost:6379 REDIS_MODE=standalone \
+GATEWAY_SECRET_KEY_FILE=tools/configs/dev_secret_key \
+DJANGO_SETTINGS_MODULE=aap_gateway_api.settings \
+pytest aap_gateway_api/tests/views/api/test_api_root.py
+```
+
+Shut down the containers when finished:
+```bash
+docker compose -p gateway -f tools/generated/docker-compose.yml down --remove-orphans
+```
+
 ## galaxy_ng
 
 ### Prepare a project virtual environment
