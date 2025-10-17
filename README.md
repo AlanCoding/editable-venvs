@@ -179,6 +179,8 @@ additional dependency groups using the format `repo:group1,group2`.
 ## Verification Tools
 
 - **`checks/canary.sh`**: Runs quick smoke tests to verify environment health
+  - Supports filtering by project: `awx`, `dab`, `eda`, `gateway`
+  - Configurable ports for CI/local compatibility via environment variables
 - **`checks/staleness.sh`**: Checks if local repositories are behind their remote counterparts
 
 ## Key Considerations

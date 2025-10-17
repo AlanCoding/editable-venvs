@@ -43,10 +43,13 @@ This guide summarizes the minimum manual steps required to reproduce the canary 
    ```bash
    pip install \
      -r requirements/requirements.txt \
-     -r requirements/requirements_dev.txt \
      -r requirements/requirements_git.txt
    ```
-3. Install AWX in editable mode so `pytest` can import the package:
+3. Install dev requirements because they conflict
+   ```bash
+   pip install -r requirements/requirements_dev.txt
+   ```
+4. Install AWX in editable mode so `pytest` can import the package:
    ```bash
    pip install -e .
    ```
@@ -60,6 +63,8 @@ AWX_LOGGING_MODE=stdout pytest \
   -W ignore::DeprecationWarning
 ```
 
+Manually verified :+1
+
 ## django-ansible-base
 
 ### Prepare a project virtual environment
@@ -71,14 +76,15 @@ AWX_LOGGING_MODE=stdout pytest \
    ```
 2. Install the development requirements that mirror the CI environment:
    ```bash
-   pip install \
-     -r requirements/requirements_dev.txt \
-     -r requirements/requirements_all.txt
+   grep -Fv 'xmlsec' requirements/requirements_all.txt | pip install --no-deps -r /dev/stdin
+   pip install -r requirements/requirements_dev.txt
    ```
 3. Install the package with the extras expected by the smoke test:
    ```bash
-   pip install -e .[authentication,rest-filters,jwt_consumer,resource-registry,rbac,feature-flags,api-documentation,oauth2-provider]
+   pip install -e .[authentication,rest-filters,jwt_consumer,resource-registry,rbac,feature-flags,api-documentation,oauth2-provider] --no-deps
    ```
+
+Most of the weirdness of these steps are to workaround temporary xmlsec issues.
 
 ### Start PostgreSQL via docker compose
 The repository ships a compose definition and convenience target that provisions PostgreSQL for development:
@@ -92,6 +98,11 @@ This target wraps the repository's Docker Compose configuration and returns once
 pytest test_app/tests/rbac/models/test_uniqueness.py
 ```
 
+Manually verified +1
+
+NOTE: we need to work on the tech debt with xmlsec.
+It is not expected that this will follow standard patterns until we do.
+
 ## eda-server
 
 ### Prepare a project virtual environment
@@ -103,8 +114,8 @@ pytest test_app/tests/rbac/models/test_uniqueness.py
    ```
 2. Export the Poetry-managed dependencies that power the integration test and install them into the active environment:
    ```bash
-   poetry export --without-hashes --with test -f requirements.txt -o /tmp/eda-test-requirements.txt
-   pip install -r /tmp/eda-test-requirements.txt
+   poetry config virtualenvs.create false
+   poetry install --with test
    ```
 3. Install the repository itself in editable mode:
    ```bash
@@ -128,48 +139,10 @@ EDA_DB_PASSWORD=secret \
 pytest tests/integration/api/test_eda_credential.py
 ```
 
-## aap-gateway
+Manually verified +1
 
-### Prepare a project virtual environment
-1. Create and activate a virtual environment:
-   ```bash
-   python3 -m venv .venv
-   source .venv/bin/activate
-   python -m pip install --upgrade pip
-   ```
-2. Install the project's runtime dependencies:
-   ```bash
-   pip install -r requirements/requirements.txt
-   ```
-3. Install the repository itself in editable mode:
-   ```bash
-   pip install -e .
-   ```
-
-### Start supporting services
-```bash
-docker compose -p gateway -f tools/generated/docker-compose.yml up --detach db redis1
-```
-Wait for the database to accept connections:
-```bash
-docker compose -p gateway -f tools/generated/docker-compose.yml exec db \
-  bash -c 'while ! pg_isready -h localhost -p 5440 -U gateway; do sleep 1; done'
-```
-
-### Run the smoke test
-```bash
-DATABASE_NAME=gateway DATABASE_USER=gateway DATABASE_PASSWORD=gateway \
-DATABASE_HOST=localhost DATABASE_PORT=5440 \
-REDIS_URL=redis://localhost:6379 REDIS_HOSTS=localhost:6379 REDIS_MODE=standalone \
-GATEWAY_SECRET_KEY_FILE=tools/configs/dev_secret_key \
-DJANGO_SETTINGS_MODULE=aap_gateway_api.settings \
-pytest aap_gateway_api/tests/views/api/test_api_root.py
-```
-
-Shut down the containers when finished:
-```bash
-docker compose -p gateway -f tools/generated/docker-compose.yml down --remove-orphans
-```
+This has some weirdness with poetry management.
+However, the manual steps, using a dedicated virtual environment, are relatively isolated and painless.
 
 ## galaxy_ng
 
@@ -230,6 +203,43 @@ PULP_MEDIA_ROOT=/tmp/pulp/media \
 PULP_FILE_UPLOAD_TEMP_DIR=/tmp/pulp/artifact-tmp \
 pytest galaxy_ng/tests/unit/test_models.py::TestSetting::test_get_settings_as_dict
 ```
+
+Manually verified +1
+
+## aap-gateway
+
+### Prepare a project virtual environment
+1. Reuse the virtual environment from django-ansible-base. This will reuse xmlsec hacks from that.
+2. Install the pinned requirements used across the fleet:
+   ```bash
+   pip install -r requirements/requirements.txt
+   pip install -r requirements/requirements_dev.txt
+   pip install -r requirements/requirements_test.txt
+   ```
+3. Install the gateway in editable mode without re-resolving dependencies:
+   ```bash
+   pip install -e .
+   ```
+4. Execute the repository's targeted validation command (for example `pytest` or a tox environment) as documented in the project README.
+
+
+### Start supporting services
+
+```bash
+docker compose -f tools/generated/docker-compose.yml up -d db redis1
+```
+
+### Run the smoke test
+```bash
+DATABASE_NAME=gateway DATABASE_USER=gateway DATABASE_PASSWORD=gateway \
+DATABASE_HOST=localhost DATABASE_PORT=5440 \
+REDIS_URL=redis://localhost:$GATEWAY_REDIS_PORT \
+REDIS_HOSTS=localhost:$GATEWAY_REDIS_PORT REDIS_MODE=standalone \
+GATEWAY_SECRET_KEY_FILE=tools/configs/dev_secret_key \
+DJANGO_SETTINGS_MODULE=aap_gateway_api.settings \
+pytest aap_gateway_api/tests/views/api/test_api_root.py
+```
+
 
 ## Cross-project template
 
