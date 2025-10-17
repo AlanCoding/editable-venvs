@@ -2,6 +2,32 @@
 
 This guide summarizes the minimum manual steps required to reproduce the canary checks run by this repository for each supported project. All commands assume repositories live under `$REPO_ROOT` (default: `$HOME/repos`) and virtual environments are created in `$HOME/venvs`.
 
+## Common prerequisites
+
+1. Install the system packages that the checks expect. The GitHub runners use the following sets:
+   - **Fedora/RHEL:**
+     ```bash
+     sudo dnf install -y \
+       postgresql postgresql-server postgresql-contrib redis \
+       docker-compose-plugin docker \
+       libxml2-devel libxmlsec1-devel libxmlsec1-openssl \
+       openldap-devel cyrus-sasl-devel openssl-devel \
+       python3-devel gcc gcc-c++ make pkgconfig libtool
+     ```
+   - **Debian/Ubuntu:**
+     ```bash
+     sudo apt-get update
+     sudo apt-get install -y \
+       postgresql postgresql-contrib redis-server docker-compose \
+       libxml2-dev libxmlsec1-dev libxmlsec1-openssl \
+       libldap2-dev libsasl2-dev libssl-dev \
+       python3-dev build-essential pkg-config \
+       libtool-bin
+     ```
+   Ensure the Docker daemon is running (e.g., `sudo systemctl start docker`) so compose commands can launch services.
+2. Create the repositories directory and clone the projects under `$REPO_ROOT` if they are not already present.
+3. When using Poetry-backed projects, keep the shared configuration files in `config/` or `config-public/` available so the helper scripts can resolve groups and post-install requirements.
+
 ## AWX
 
 ### Prepare a project virtual environment
@@ -165,9 +191,9 @@ While this private repository is not exercised by automated checks here, the sha
 
 Use this template to capture new project smoke tests in a consistent format.
 
-1. **Clone and path setup**
-   - Ensure the repository lives under `$REPO_ROOT/<project>`.
-   - Export any project-specific environment variables required for tooling (e.g., `AWX_REPO_NAME`, custom ports).
+1. **System dependencies**
+   - Install platform packages and command-line tools required by the project (database clients, Docker, build headers). See [Common prerequisites](#common-prerequisites) for baseline packages.
+   - Export any project-specific environment variables required before provisioning services.
 2. **Virtual environment creation**
    - For unified installs: `CONFIG_DIR=<config> ./create_venv.sh <venv-name>`.
    - For split installs: `CONFIG_DIR=<config> ./create_project_venv.sh <venv-name> <project-key>`.
