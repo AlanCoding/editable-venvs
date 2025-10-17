@@ -73,14 +73,20 @@ AWX_LOGGING_MODE=stdout pytest \
      -r requirements/requirements_dev.txt \
      -r requirements/requirements_all.txt
    ```
-3. Install the package with the extras expected by the smoke test while avoiding a second dependency resolution pass:
+3. Install the package with the extras expected by the smoke test:
    ```bash
-   pip install -e .[authentication,rest-filters,jwt_consumer,resource-registry,rbac,feature-flags,api-documentation,oauth2-provider] --no-deps
+   pip install -e .[authentication,rest-filters,jwt_consumer,resource-registry,rbac,feature-flags,api-documentation,oauth2-provider]
    ```
+
+### Start PostgreSQL via docker compose
+The repository ships a compose definition and convenience target that provisions PostgreSQL for development:
+```bash
+make postgres
+```
+This target wraps the repository's Docker Compose configuration and returns once the database container is accepting connections.
 
 ### Run the smoke test
 ```bash
-make postgres
 pytest test_app/tests/rbac/models/test_uniqueness.py
 ```
 
@@ -179,26 +185,6 @@ PULP_MEDIA_ROOT=/tmp/pulp/media \
 PULP_FILE_UPLOAD_TEMP_DIR=/tmp/pulp/artifact-tmp \
 pytest galaxy_ng/tests/unit/test_models.py::TestSetting::test_get_settings_as_dict
 ```
-
-## aap-gateway (reference)
-
-While this private repository is not exercised by automated checks here, the shared tooling reveals how to bootstrap its environment:
-
-1. Create and activate a virtual environment:
-   ```bash
-   python3 -m venv .venv
-   source .venv/bin/activate
-   python -m pip install --upgrade pip
-   ```
-2. Install the pinned requirements used across the fleet:
-   ```bash
-   pip install -r requirements/requirements.txt
-   ```
-3. Install the gateway in editable mode without re-resolving dependencies:
-   ```bash
-   pip install -e . --no-deps
-   ```
-4. Execute the repository's targeted validation command (for example `pytest` or a tox environment) as documented in the project README.
 
 ## Cross-project template
 
