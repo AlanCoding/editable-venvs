@@ -110,6 +110,7 @@ run_galaxy_ng() {
 
     compose "${compose_args[@]}" up --force-recreate -d postgres >/dev/null
     compose "${compose_args[@]}" exec postgres bash -c 'while ! pg_isready -U galaxy_ng; do sleep 1; done'
+    sleep 10
 
     rm -rf /tmp/pulp
     mkdir -p /tmp/pulp/tmp /tmp/pulp/artifact-tmp /tmp/pulp/media /tmp/pulp/assets
