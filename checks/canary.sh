@@ -90,9 +90,19 @@ run_galaxy_ng() {
     fi
 
     compose_args=(-p galaxy_ng -f dev/compose/aap.yaml)
+    override_file=""
+
+    if [[ -n "${GALAXY_PG_PORT:-}" ]]; then
+      override_file="$(mktemp)"
+      printf 'services:\n  postgres:\n    ports:\n      - "%s:5432"\n' "$GALAXY_PG_PORT" >"$override_file"
+      compose_args+=(-f "$override_file")
+    fi
 
     cleanup() {
       compose "${compose_args[@]}" down --remove-orphans --volumes >/dev/null 2>&1 || true
+      if [[ -n "$override_file" && -f "$override_file" ]]; then
+        rm -f "$override_file"
+      fi
     }
 
     cleanup
