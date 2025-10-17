@@ -89,6 +89,8 @@ run_galaxy_ng() {
       exit 1
     fi
 
+    compose -p galaxy_ng -f dev/compose/aap.yaml down --remove-orphans --volumes >/dev/null 2>&1 || true
+
     compose_args=(-p galaxy_ng -f dev/compose/aap.yaml)
     override_file=""
 
@@ -105,7 +107,6 @@ run_galaxy_ng() {
       fi
     }
 
-    cleanup
     trap cleanup EXIT
 
     compose "${compose_args[@]}" up --force-recreate -d postgres >/dev/null
