@@ -8,7 +8,7 @@ on:
   workflow_dispatch:
 
 jobs:
-  test:
+  unified:
     runs-on: ubuntu-latest
     env:
       REPO_ROOT: ${{ github.workspace }}/repos
@@ -20,7 +20,7 @@ jobs:
     strategy:
       matrix:
         python-version: ['3.11', '3.12']
-        
+
     steps:
     - name: Checkout editable-venvs
       uses: actions/checkout@v4
@@ -91,7 +91,7 @@ jobs:
         sudo systemctl start postgresql
         sudo systemctl start redis-server
 
-    - name: Create test virtual environment
+    - name: Create unified virtual environment
       run: |
         cd ${{ github.workspace }}/editable-venvs
         export CONFIG_DIR=config-public
@@ -114,6 +114,119 @@ jobs:
         cd ${{ github.workspace }}/editable-venvs
         source $HOME/venvs/test-ci/bin/activate
         ./checks/canary.sh eda
+
+    - name: Debug sanitized files on failure
+      if: failure()
+      run: |
+        cd ${{ github.workspace }}/editable-venvs
+        echo "🔍 DEBUG: Contents of sanitized/ folder:"
+        if [ -d "sanitized" ]; then
+          for file in sanitized/*; do
+            if [ -f "$file" ]; then
+              echo "📄 File: $file"
+              echo "----------------------------------------"
+              cat "$file"
+              echo "----------------------------------------"
+              echo
+            fi
+          done
+        else
+          echo "❌ sanitized/ directory not found"
+        fi
+
+  split-projects:
+    runs-on: ubuntu-latest
+    needs: unified
+    env:
+      REPO_ROOT: ${{ github.workspace }}/repos
+      AWX_REPO_NAME: awx
+      EDA_PG_PORT: 15432
+      EDA_REDIS_PORT: 16379
+      GALAXY_PG_PORT: 15433
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - project: awx
+            venv: awx-split
+            check: awx
+            python: '3.11'
+          - project: django-ansible-base
+            venv: dab-split
+            check: django-ansible-base
+            python: '3.11'
+          - project: eda-server
+            venv: eda-server-split
+            check: eda-server
+            python: '3.11'
+          - project: galaxy_ng
+            venv: galaxy-ng-split
+            check: galaxy_ng
+            python: '3.11'
+
+    steps:
+    - name: Checkout editable-venvs
+      uses: actions/checkout@v4
+      with:
+        path: editable-venvs
+
+    - name: Set up Python ${{ matrix.python }}
+      uses: actions/setup-python@v4
+      with:
+        python-version: ${{ matrix.python }}
+
+    - name: Set up repositories directory
+      run: |
+        mkdir -p $HOME/repos
+        cd $HOME/repos
+
+    - name: Checkout AWX
+      uses: actions/checkout@v4
+      with:
+        repository: ansible/awx
+        path: ${{ github.workspace }}/repos/awx
+
+    - name: Checkout EDA Server
+      uses: actions/checkout@v4
+      with:
+        repository: ansible/eda-server
+        path: ${{ github.workspace }}/repos/eda-server
+
+    - name: Checkout django-ansible-base
+      uses: actions/checkout@v4
+      with:
+        repository: ansible/django-ansible-base
+        path: ${{ github.workspace }}/repos/django-ansible-base
+
+    - name: Checkout Galaxy NG
+      uses: actions/checkout@v4
+      with:
+        repository: ansible/galaxy_ng
+        path: ${{ github.workspace }}/repos/galaxy_ng
+
+    - name: Install system dependencies
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y \
+          postgresql postgresql-contrib redis-server docker-compose \
+          libxml2-dev libxmlsec1-dev libxmlsec1-openssl \
+          libldap2-dev libsasl2-dev libssl-dev \
+          python3-dev build-essential pkg-config \
+          libtool-bin
+        sudo systemctl start postgresql
+        sudo systemctl start redis-server
+
+    - name: Create project virtual environment
+      run: |
+        cd ${{ github.workspace }}/editable-venvs
+        export CONFIG_DIR=config-public
+        ./create_project_venv.sh ${{ matrix.venv }} ${{ matrix.project }}
+
+    - name: Run project canary test
+      run: |
+        cd ${{ github.workspace }}/editable-venvs
+        source $HOME/venvs/${{ matrix.venv }}/bin/activate
+        ./checks/canary.sh ${{ matrix.check }}
 
     - name: Debug sanitized files on failure
       if: failure()

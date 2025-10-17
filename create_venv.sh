@@ -125,8 +125,15 @@ if [[ -f "$POETRY_PROJECTS_FILE" ]]; then
   echo
   echo "Phase 2.5: Exporting poetry projects to requirements files"
 
-  while IFS= read -r poetry_project; do
-    [[ -z "$poetry_project" || "$poetry_project" =~ ^# ]] && continue
+  while IFS= read -r poetry_line; do
+    [[ -z "$poetry_line" || "$poetry_line" =~ ^# ]] && continue
+
+    poetry_project="${poetry_line%%:*}"
+    poetry_groups_raw="${poetry_line#*:}"
+    if [[ "$poetry_groups_raw" == "$poetry_line" ]]; then
+      poetry_groups_raw=""
+    fi
+
     poetry_project_path="$REPO_ROOT/$poetry_project"
     if [[ ! -d "$poetry_project_path" ]]; then
       echo "Skipping missing poetry project: $poetry_project_path"
@@ -139,8 +146,19 @@ if [[ -f "$POETRY_PROJECTS_FILE" ]]; then
 
     sanitized_poetry_req="$SANITIZED_DIR/$(basename "$poetry_project").txt"
     echo "  Exporting poetry project $poetry_project to: $sanitized_poetry_req"
-    echo "    Running: poetry export --without-hashes -f requirements.txt -C $poetry_project_path"
-    "$BUILD_VENV_DIR/bin/poetry" export --without-hashes -f requirements.txt -o "$(pwd)/$sanitized_poetry_req" -C "$poetry_project_path"
+    cmd=("$BUILD_VENV_DIR/bin/poetry" export --without-hashes -f requirements.txt -o "$(pwd)/$sanitized_poetry_req" -C "$poetry_project_path")
+
+    if [[ -n "$poetry_groups_raw" ]]; then
+      # Allow multiple groups, separated by commas in the config entry
+      poetry_groups="$(echo "$poetry_groups_raw" | tr -d '[:space:]')"
+      if [[ -n "$poetry_groups" ]]; then
+        cmd+=(--with "$poetry_groups")
+        echo "    Including Poetry groups: $poetry_groups"
+      fi
+    fi
+
+    echo "    Running: ${cmd[*]}"
+    "${cmd[@]}"
     echo "    Export completed successfully"
   done < "$POETRY_PROJECTS_FILE"
 fi

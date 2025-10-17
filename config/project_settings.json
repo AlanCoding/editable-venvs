@@ -1,0 +1,78 @@
+{
+  "awx": {
+    "repo": "awx",
+    "install_type": "editable",
+    "extras": [],
+    "requirements": [
+      "awx/requirements/requirements.txt",
+      "awx/requirements/requirements_dev.txt",
+      "awx/requirements/requirements_git.txt"
+    ]
+  },
+  "django-ansible-base": {
+    "repo": "django-ansible-base",
+    "install_type": "editable_no_deps",
+    "extras": [
+      "authentication",
+      "rest-filters",
+      "jwt_consumer",
+      "resource-registry",
+      "rbac",
+      "feature-flags",
+      "api-documentation",
+      "oauth2-provider"
+    ],
+    "requirements": [
+      "django-ansible-base/requirements/requirements_dev.txt",
+      "django-ansible-base/requirements/requirements_all.txt"
+    ]
+  },
+  "eda-server": {
+    "repo": "eda-server",
+    "install_type": "editable",
+    "extras": [],
+    "requirements": [],
+    "poetry": true,
+    "poetry_groups": [
+      "test"
+    ]
+  },
+  "awx_plugins.interfaces": {
+    "repo": "awx_plugins.interfaces",
+    "install_type": "editable",
+    "extras": [],
+    "requirements": [],
+    "post_requirements": [
+      "awx_plugins.interfaces/dependencies/direct/py.in"
+    ]
+  },
+  "awx-plugins": {
+    "repo": "awx-plugins",
+    "install_type": "editable",
+    "extras": [
+      "credentials-github-app"
+    ],
+    "requirements": [],
+    "post_requirements": [
+      "awx-plugins/dependencies/direct/py.in"
+    ]
+  },
+  "dispatcherd": {
+    "repo": "dispatcherd",
+    "install_type": "editable",
+    "extras": [],
+    "requirements": [],
+    "post_requirements": [
+      "dispatcherd/requirements_dev.txt"
+    ]
+  },
+  "galaxy_ng": {
+    "repo": "galaxy_ng",
+    "install_type": "editable",
+    "extras": [],
+    "requirements": [],
+    "post_requirements": [
+      "galaxy_ng/unittest_requirements.txt"
+    ]
+  }
+}
