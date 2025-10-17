@@ -3,13 +3,17 @@ set -euo pipefail
 
 REPO_ROOT="${REPO_ROOT:-$HOME/repos}"
 AWX_REPO_NAME="${AWX_REPO_NAME:-tower}"  # Default to tower, can override with awx
-CHECK_FILTER="${1:-}"  # Optional arg: awx, dab, eda, galaxy_ng
+CHECK_FILTER="${1:-}"  # Optional arg: awx, dab, eda, galaxy_ng, gateway
 
 # Configurable ports for CI/local compatibility
 # These can be overridden via environment variables (e.g., in GitHub Actions)
 EDA_PG_PORT="${EDA_PG_PORT:-5432}"
 EDA_REDIS_PORT="${EDA_REDIS_PORT:-6379}"
 GALAXY_PG_PORT="${GALAXY_PG_PORT:-5433}"
+GATEWAY_DB_PORT="${GATEWAY_DB_PORT:-5440}"
+GATEWAY_REDIS_PORT="${GATEWAY_REDIS_PORT:-6379}"
+GATEWAY_COMPOSE_FILE="${GATEWAY_COMPOSE_FILE:-tools/generated/docker-compose.yml}"
+GATEWAY_COMPOSE_PROJECT="${GATEWAY_COMPOSE_PROJECT:-gateway}"
 
 compose() {
   if command -v docker >/dev/null 2>&1 && docker compose version >/dev/null 2>&1; then
@@ -60,6 +64,58 @@ run_eda() {
     EDA_DB_HOST=localhost EDA_DB_PORT="$EDA_PG_PORT" EDA_MQ_HOST=localhost EDA_MQ_PORT="$EDA_REDIS_PORT" \
       DJANGO_SETTINGS_MODULE=aap_eda.settings.default EDA_SECRET_KEY=insecure EDA_DB_PASSWORD=secret \
       pytest tests/integration/api/test_eda_credential.py
+  )
+}
+
+run_gateway() {
+  echo
+  echo "🔎 aap-gateway"
+  echo "Using repository: $REPO_ROOT/aap-gateway"
+  (
+    set -euo pipefail
+    cd "$REPO_ROOT/aap-gateway"
+
+    if [[ ! -f "$GATEWAY_COMPOSE_FILE" ]]; then
+      echo "❌ Missing compose file: $GATEWAY_COMPOSE_FILE" >&2
+      exit 1
+    fi
+
+    compose_args=(-p "$GATEWAY_COMPOSE_PROJECT" -f "$GATEWAY_COMPOSE_FILE")
+
+    cleanup() {
+      compose "${compose_args[@]}" down --remove-orphans >/dev/null 2>&1 || true
+    }
+
+    trap cleanup EXIT
+
+    compose "${compose_args[@]}" up --detach db redis1
+
+    db_host="${GATEWAY_DATABASE_HOST:-localhost}"
+    db_name="${GATEWAY_DATABASE_NAME:-gateway}"
+    db_user="${GATEWAY_DATABASE_USER:-gateway}"
+    db_password="${GATEWAY_DATABASE_PASSWORD:-gateway}"
+    db_port="${GATEWAY_DB_PORT}"
+
+    redis_host="${GATEWAY_REDIS_HOST:-localhost}"
+    redis_port="${GATEWAY_REDIS_PORT}"
+    redis_url="${GATEWAY_REDIS_URL:-redis://$redis_host:$redis_port}"
+    redis_hosts="${GATEWAY_REDIS_HOSTS:-$redis_host:$redis_port}"
+    redis_mode="${GATEWAY_REDIS_MODE:-standalone}"
+
+    secret_key_file="${GATEWAY_SECRET_KEY_FILE:-tools/configs/dev_secret_key}"
+    settings_module="${GATEWAY_DJANGO_SETTINGS_MODULE:-aap_gateway_api.settings}"
+
+    DATABASE_NAME="$db_name" \
+      DATABASE_USER="$db_user" \
+      DATABASE_PASSWORD="$db_password" \
+      DATABASE_HOST="$db_host" \
+      DATABASE_PORT="$db_port" \
+      REDIS_URL="$redis_url" \
+      REDIS_HOSTS="$redis_hosts" \
+      REDIS_MODE="$redis_mode" \
+      GATEWAY_SECRET_KEY_FILE="$secret_key_file" \
+      DJANGO_SETTINGS_MODULE="$settings_module" \
+      pytest aap_gateway_api/tests/views/api/test_api_root.py
   )
 }
 
@@ -128,6 +184,7 @@ case "$CHECK_FILTER" in
     run_awx
     run_dab
     run_eda
+    run_gateway
     run_galaxy_ng
     ;;
   awx )
@@ -139,12 +196,15 @@ case "$CHECK_FILTER" in
   eda | eda-server )
     run_eda
     ;;
+  gateway | aap-gateway )
+    run_gateway
+    ;;
   galaxy_ng )
     run_galaxy_ng
     ;;
   * )
     echo "❌ Unknown check: $CHECK_FILTER"
-    echo "   Expected one of: awx, dab, django-ansible-base, eda, eda-server, galaxy_ng"
+    echo "   Expected one of: awx, dab, django-ansible-base, eda, eda-server, gateway, aap-gateway, galaxy_ng"
     exit 1
     ;;
 esac
