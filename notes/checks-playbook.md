@@ -9,11 +9,13 @@ This guide summarizes the minimum manual steps required to reproduce the canary 
      ```bash
      sudo dnf install -y \
        postgresql postgresql-server postgresql-contrib redis \
-       docker-compose-plugin docker \
+       moby-engine moby-compose \
        libxml2-devel libxmlsec1-devel libxmlsec1-openssl \
        openldap-devel cyrus-sasl-devel openssl-devel \
        python3-devel gcc gcc-c++ make pkgconfig libtool
      ```
+     The `moby-*` packages ship the `docker` CLI and compatible compose plugin,
+     avoiding conflicts with repositories that also provide `docker-ce`.
    - **Debian/Ubuntu:**
      ```bash
      sudo apt-get update
